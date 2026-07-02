@@ -1,9 +1,6 @@
 # Stormworks MC Simulator
 
 A desktop application for editing and simulating Stormworks microcontroller logic outside of the game. Built with C++17 and Qt6.
-
-![Stormworks MC Simulator](docs/screenshot.png)
-
 ---
 
 ## Features
@@ -42,61 +39,61 @@ A desktop application for editing and simulating Stormworks microcontroller logi
 ## Supported Node Types
 
 ### I/O (Bridge Nodes)
-| Node | Description |
-|------|-------------|
-| Bool Input | Boolean signal coming into the MC from the vehicle |
-| Bool Output | Boolean signal going out from the MC to the vehicle |
-| Number Input | Number signal coming into the MC — configurable slider range and step |
-| Number Output | Number signal going out from the MC |
-| Number Literal | Constant number value — configurable via ⚙ |
+|      Node       |                           Description                                 |
+|-----------------|-----------------------------------------------------------------------|
+| Bool Input      | Boolean signal coming into the MC from the vehicle                    |
+| Bool Output     | Boolean signal going out from the MC to the vehicle                   |
+| Number Input    | Number signal coming into the MC — configurable slider range and step |
+| Number Output   | Number signal going out from the MC                                   |
+| Number Literal  | Constant number value — configurable via settings                     |
 
 ### Logic Gates
-| Node | Type ID | Description |
-|------|---------|-------------|
-| NOT | (no type) | Logical invert |
-| AND | 1 | True when all inputs true |
-| OR | 2 | True when any input true |
-| XOR | 3 | True when inputs differ |
-| NAND | 4 | NOT AND |
-| NOR | 5 | NOT OR |
+| Node | Type ID |        Description        |
+|------|---------|---------------------------|
+| NOT  |(no type)| Logical invert            |
+| AND  | 1       | True when all inputs true |
+| OR   | 2       | True when any input true  |
+| XOR  | 3       | True when inputs differ   |
+| NAND | 4       | NOT AND                   |
+| NOR  | 5       | NOT OR                    |
 
 ### Math
-| Node | Type ID | Description |
-|------|---------|-------------|
-| Add | 6 | A + B |
-| Subtract | 7 | A − B |
-| Multiply | 8 | A × B |
-| Divide | 9 | A ÷ B (IsError output goes true on divide-by-zero) |
-| Clamp | 10 | Clamp value to [min, max] — bounds configurable via ⚙ |
-| Abs | 11 | Absolute value |
-| Min | 12 | Minimum of A and B |
-| Max | 13 | Maximum of A and B |
-| Modulo | 14 | A mod B |
-| Number Literal | 15 | Constant value — configurable via ⚙ |
-| Greater Than | 17 | A > B → bool |
-| Less Than | 18 | A < B → bool |
-| Equal To | 42 | \|A − B\| ≤ tolerance → bool — tolerance configurable via ⚙ |
+|     Node       | Type ID |                           Description                             |
+|----------------|---------|-------------------------------------------------------------------|
+| Add            | 6       | A + B                                                             |
+| Subtract       | 7       | A − B                                                             |
+| Multiply       | 8       | A × B                                                             |
+| Divide         | 9       | A ÷ B (IsError output goes true on divide-by-zero)                |
+| Clamp          | 10      | Clamp value to [min, max] — bounds configurable via settings      |
+| Abs            | 11      | Absolute value                                                    |
+| Min            | 12      | Minimum of A and B                                                |
+| Max            | 13      | Maximum of A and B                                                |
+| Modulo         | 14      | A mod B                                                           |
+| Number Literal | 15      | Constant value — configurable via settings                        |
+| Greater Than   | 17      | A > B → bool                                                      |
+| Less Than      | 18      | A < B → bool                                                      |
+| Equal To       | 42      | \|A − B\| ≤ tolerance → bool — tolerance configurable via settings|
 
 ### Composite
-| Node | Type ID | Description |
-|------|---------|-------------|
-| Composite Input | 4 (bridge) | Composite wire coming into the MC — per-channel index and type configurable in I/O panel |
-| Composite Read (Number) | 31 | Reads one number channel from a composite wire — channel index configurable via ⚙ |
-| Composite Read (Bool) | 29 | Reads one bool channel from a composite wire — channel index configurable via ⚙ |
-| Composite Write (Number) | 40 | Writes number channels onto a composite wire — channel count and start index configurable via ⚙ |
-| Composite Write (Bool) | 41 | Writes bool channels onto a composite wire — channel count and start index configurable via ⚙ |
-| Composite Packer | — | Packs individual channels into a composite wire — channel count configurable via ⚙ |
+|          Node            |   Type ID  |                                            Description                                                 |
+|--------------------------|------------|--------------------------------------------------------------------------------------------------------|
+| Composite Input          | 4 (bridge) | Composite wire coming into the MC — per-channel index and type configurable in I/O panel               |
+| Composite Read (Number)  |     31     | Reads one number channel from a composite wire — channel index configurable via settings               |
+| Composite Read (Bool)    |     29     | Reads one bool channel from a composite wire — channel index configurable via settings                 |
+| Composite Write (Number) |     40     | Writes number channels onto a composite wire — channel count and start index configurable via settings |
+| Composite Write (Bool)   |     41     | Writes bool channels onto a composite wire — channel count and start index configurable via settings   |
+| Composite Packer         |     —      | Packs individual channels into a composite wire — channel count configurable via settings              |
 
 ### Stateful
-| Node | Type ID | Description |
-|------|---------|-------------|
-| Up/Down Counter | 37 | Counts up/down by a configurable step, optional min/max clamp, configurable reset value |
-| TON Timer | 49 | Output goes true after Enable has been true for ≥ Duration. Resets when Enable goes false |
-| TOF Timer | 50 | Output goes true while elapsed < Duration after Enable goes false |
-| RTO Timer | 51 | Retentive TON — accumulates time across Enable pulses, resets only via Reset input |
-| RTF Timer | 52 | Retentive TOF — true while elapsed < Duration, resets only via Reset input |
-| PID Controller | 23 | PID control loop — Kp/Ki/Kd configurable via ⚙, resets integral on disable |
-| PID Advanced | 39 | PID control loop with Kp/Ki/Kd as live number input ports |
+|      Node       | Type ID |                                       Description                                         |
+|-----------------|---------|-------------------------------------------------------------------------------------------|
+| Up/Down Counter | 37      | Counts up/down by a configurable step, optional min/max clamp, configurable reset value   |
+| TON Timer       | 49      | Output goes true after Enable has been true for ≥ Duration. Resets when Enable goes false |
+| TOF Timer       | 50      | Output goes true while elapsed < Duration after Enable goes false                         |
+| RTO Timer       | 51      | Retentive TON — accumulates time across Enable pulses, resets only via Reset input        |
+| RTF Timer       | 52      | Retentive TOF — true while elapsed < Duration, resets only via Reset input                |
+| PID Controller  | 23      | PID control loop — Kp/Ki/Kd configurable via settings, resets integral on disable         |
+| PID Advanced    | 39      | PID control loop with Kp/Ki/Kd as live number input ports                                 |
 
 ---
 
