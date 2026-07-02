@@ -1,0 +1,3 @@
+C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build/CMakeFiles/StormworksSim.dir
+C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build/CMakeFiles/ZERO_CHECK.dir

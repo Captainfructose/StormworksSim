@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\mocs_compilation_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Node.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Microcontroller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\LogicNodes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\MathNodes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\IONodes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\CompositeNodes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\MainWindow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphItem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\ConnectionItem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\EWIEGA46WW\qrc_resources_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\mocs_compilation_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\EWIEGA46WW\qrc_resources_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\mocs_compilation_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\EWIEGA46WW\qrc_resources_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\StormworksSim_autogen\EWIEGA46WW\qrc_resources_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Node.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Connection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Microcontroller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\LogicNodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\MathNodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\IONodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\StatefulNodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\nodes\CompositeNodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\MainWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphView.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphItem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\ConnectionItem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build\CMakeFiles\82c2773d4b841bd5b79701639b5a6f53\qrc_resources_(CONFIG).cpp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\resources.qrc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{2412D037-2FA6-3874-B54B-DC047EFB72BB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{ACC0402F-84CF-38B1-B5B9-51EC697A605C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{F0E313B8-9BE5-3181-832D-E01B878926CE}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

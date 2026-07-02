@@ -1,0 +1,24 @@
+^C:\USERS\STALE\ONEDRIVE\DOCUMENTS\PROGRAMMING PROJECTS\C++ PROJECTS\STORMWORKSSIM\BUILD\CMAKEFILES\82C2773D4B841BD5B79701639B5A6F53\QRC_RESOURCES_(CONFIG).CPP.RULE
+setlocal
+cd "C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build/CMakeFiles/StormworksSim_autogen.dir/AutoRcc_resources_EWIEGA46WW_Info.json" Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\STALE\ONEDRIVE\DOCUMENTS\PROGRAMMING PROJECTS\C++ PROJECTS\STORMWORKSSIM\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim" "-BC:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build" --check-stamp-file "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build_msvc\CMakeFiles\a0cda46c07df3ebb263aa969f70d7d06\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{9EB773AF-D7E3-3352-B153-C5114C9F2001}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
