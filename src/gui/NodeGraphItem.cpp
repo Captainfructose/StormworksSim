@@ -683,7 +683,7 @@ void NodeGraphItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 // ─────────────────────────────────────────────────────────────────────────────
 // openSettingsDialog
 //
-// Opens a small modal dialog with settings relevant to this node type.
+// Opens a small modal dialog with settings relevant with this node type.
 // Changes take effect immediately on the underlying Node object.
 // ─────────────────────────────────────────────────────────────────────────────
 void NodeGraphItem::openSettingsDialog()
