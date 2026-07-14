@@ -2,10 +2,10 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "Debug/StormworksSim.exe"
+			"path" : "RelWithDebInfo/StormworksSim.exe"
 		},
 		{
-			"path" : "Debug/StormworksSim.pdb"
+			"path" : "RelWithDebInfo/StormworksSim.pdb"
 		}
 	],
 	"backtrace" : 1,
@@ -204,7 +204,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd"
+					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /O2 /Ob1 /DNDEBUG -std:c++17 -MD"
 				},
 				{
 					"backtrace" : 2,
@@ -228,6 +228,10 @@
 				{
 					"backtrace" : 2,
 					"define" : "QT_GUI_LIB"
+				},
+				{
+					"backtrace" : 2,
+					"define" : "QT_NO_DEBUG"
 				},
 				{
 					"backtrace" : 2,
@@ -266,7 +270,7 @@
 			[
 				{
 					"backtrace" : 0,
-					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_Debug"
+					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_RelWithDebInfo"
 				},
 				{
 					"backtrace" : 25,
@@ -344,7 +348,7 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -MDd",
+				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /O2 /Ob1 /DNDEBUG -MD",
 				"role" : "flags"
 			},
 			{
@@ -357,17 +361,17 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Widgetsd.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Widgets.lib",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Xmld.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Xml.lib",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 9,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Guid.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Gui.lib",
 				"role" : "libraries"
 			},
 			{
@@ -392,7 +396,7 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Cored.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Core.lib",
 				"role" : "libraries"
 			},
 			{
@@ -432,11 +436,11 @@
 	"orderDependencies" : 
 	[
 		{
-			"backtrace" : 0,
-			"id" : "Qt6::moc::@6890427a1f51a3e7e1df"
+			"id" : "Qt6::rcc::@6890427a1f51a3e7e1df"
 		},
 		{
-			"id" : "Qt6::rcc::@6890427a1f51a3e7e1df"
+			"backtrace" : 0,
+			"id" : "Qt6::moc::@6890427a1f51a3e7e1df"
 		},
 		{
 			"backtrace" : 0,
@@ -510,7 +514,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_Debug.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_RelWithDebInfo.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -659,7 +663,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_Debug.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_RelWithDebInfo.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{

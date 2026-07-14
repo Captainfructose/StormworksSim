@@ -3,9 +3,11 @@
 #include "../core/nodes/CompositeNodes.h"
 #include "../core/nodes/MathNodes.h"
 #include "../core/nodes/StatefulNodes.h"
+#include "../core/nodes/FunctionNodes.h"
 #include <QDebug>
 
 #include <QPainter>
+#include <QCoreApplication>
 #include <QStyleOptionGraphicsItem>
 #include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
@@ -18,6 +20,7 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QDialogButtonBox>
+#include <QLineEdit>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QScrollArea>
@@ -109,6 +112,11 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::TimerRTO:
         case NodeType::TimerRTF:
         case NodeType::PIDController:
+        case NodeType::Function1:
+        case NodeType::Function3:
+        case NodeType::Function8:
+        case NodeType::FunctionBool4:
+        case NodeType::FunctionBool8:
             return true;
         default:
             return false;
@@ -682,12 +690,12 @@ void NodeGraphItem::openSettingsDialog()
 {
     QDialog dialog;
     dialog.setWindowTitle(QString("Settings — %1").arg(node_->name));
-    dialog.setFixedWidth(280);
+    dialog.setMinimumWidth(400);
     dialog.setStyleSheet(
         "QDialog { background: #2a2a2a; color: #ddd; }"
         "QLabel { color: #ccc; }"
         "QPushButton { background: #3a3a3a; color: #ddd; border: 1px solid #555; "
-        "  padding: 4px 12px; border-radius: 3px; }"
+        "padding: 4px 12px; border-radius: 3px; }"
         "QPushButton:hover { background: #4a4a4a; }"
     );
 
@@ -1018,6 +1026,140 @@ void NodeGraphItem::openSettingsDialog()
             pid->kp = kpSpin->value();
             pid->ki = kiSpin->value();
             pid->kd = kdSpin->value();
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Function Evaluator Nodes ───────────────────────────────────────────────
+    else if (node_->type == NodeType::Function1 || node_->type == NodeType::Function3 ||
+             node_->type == NodeType::Function8  || node_->type == NodeType::FunctionBool4 ||
+             node_->type == NodeType::FunctionBool8) {
+
+        dialog.setMinimumWidth(400);
+
+        // Force the dialog to always fit its content — this is what allows
+        // it to shrink back down when collapsible sections are closed
+        layout->setSizeConstraint(QLayout::SetFixedSize);
+
+        FunctionNodeBase* fn = static_cast<FunctionNodeBase*>(node_);
+
+        // Show which variables are available based on node type
+        QString varHint;
+        switch (node_->type) {
+            case NodeType::Function1:     varHint = "Variable: x"; break;
+            case NodeType::Function3:     varHint = "Variables: x, y, z"; break;
+            case NodeType::Function8:     varHint = "Variables: x, y, z, w, a, b, c, d"; break;
+            case NodeType::FunctionBool4: varHint = "Variables: x, y, z, w (bool → 0/1)"; break;
+            case NodeType::FunctionBool8: varHint = "Variables: x,y,z,w,a,b,c,d (bool → 0/1)"; break;
+            default: break;
+        }
+
+        auto* hintLbl = new QLabel(varHint);
+        hintLbl->setStyleSheet("color: #acacac; font-size: 14px;");
+        layout->addWidget(hintLbl);
+
+        layout->addWidget(new QLabel("Expression:"));
+        auto* exprEdit = new QLineEdit;
+        exprEdit->setText(fn->expression);
+        exprEdit->setPlaceholderText("e.g. (x * 4) - 5");
+        exprEdit->setMinimumWidth(400);
+        layout->addWidget(exprEdit);
+
+        // ── Collapsible reference sections ────────────────────────────────────
+        // Helper that creates a toggle button + hidden body widget pair
+        auto makeSection = [&](const QString& title, const QString& content) {
+            auto* sectionWidget = new QWidget;
+            auto* sectionLayout = new QVBoxLayout(sectionWidget);
+            sectionLayout->setContentsMargins(0, 0, 0, 0);
+            sectionLayout->setSpacing(0);
+
+            auto* toggle = new QPushButton("▶  " + title);
+            toggle->setCheckable(true);
+            toggle->setChecked(false);
+            toggle->setStyleSheet(
+                "QPushButton { background: #2e2e2e; color: #aaa; border: none; "
+                "  text-align: left; padding: 4px 6px; font-size: 14px; }"
+                "QPushButton:checked { color: #ddd; background: #383838; }"
+                "QPushButton:hover { background: #383838; }");
+            sectionLayout->addWidget(toggle);
+
+            auto* body = new QLabel(content);
+            body->setStyleSheet("color: #cfcfcf; font-size: 14px; padding: 4px 10px;");
+            body->setWordWrap(false);
+            body->setVisible(false);
+            sectionLayout->addWidget(body);
+
+            QObject::connect(toggle, &QPushButton::toggled, [toggle, body, &dialog](bool on) {
+                body->setVisible(on);
+                toggle->setText((on ? "▼  " : "▶  ") + toggle->text().mid(3));
+                
+                // Allow the layout to recalculate
+                QCoreApplication::processEvents();
+            
+                if (!on) {
+                    // FORCE the dialog to shrink back down to its new minimum vertical size
+                    // while keeping its current width
+                    dialog.resize(dialog.width(), dialog.minimumSizeHint().height());
+                } else {
+                    dialog.adjustSize();
+                }
+            });
+
+            layout->addWidget(sectionWidget);
+        };
+
+        makeSection("Operators",
+            "+   Addition\n"
+            "-   Subtraction\n"
+            "*   Multiply\n"
+            "/   Divide\n"
+            "%   Modulo\n"
+            "^   Power");
+
+        makeSection("Constants",
+            "pi      3.14159...\n"
+            "pi2     Pi*2\n");
+
+        makeSection("Trigonometry",
+            "sin(x)      Sine\n"
+            "cos(x)      Cosine\n"
+            "tan(x)      Tangent\n"
+            "asin(x)     Arcsine\n"
+            "acos(x)     Arccosine\n"
+            "atan(x)     Arctangent\n"
+            "atan2(x,y)  Two-argument arctangent");
+
+        makeSection("Math Functions",
+            "abs(x)        absolute value\n"
+            "sgn(x)        sign of x (-1, 0, or 1)\n"
+            "sqrt(x)       square root\n"
+            "ceil(x)       ceiling\n"
+            "floor(x)      floor\n"
+            "round(x)      round to nearest integer\n"
+            "max(x,y)      larger of x and y\n"
+            "min(x,y)      smaller of x and y");
+
+        makeSection("Vector & Interpolation",
+            "len(x,y)      length of vector (x,y)\n"
+            "len2(x,y)     squared length of vector (x,y)\n"
+            "lerp(x,y,z)   linear interpolation from x to y by factor z\n"
+            "clamp(x,y,z)  clamp x between y and z");
+
+        makeSection("Conversions",
+            "X*3.6         m/s to kmph\n"
+            "X*2.236936    m/s to mph\n"
+            "X*1.943844    m/s to knots\n"
+            "Pi2           Turns to Radians\n"
+            "X*(Pi/180)    Degrees to Radians\n"
+            "X*(180/Pi)    Radians to Degrees\n");
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            fn->expression = exprEdit->text().trimmed();
             update();
             dialog.accept();
         });

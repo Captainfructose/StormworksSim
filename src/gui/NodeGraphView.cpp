@@ -369,8 +369,6 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(mathMenu, "Divide",       NodeType::Divide);
     addEntry(mathMenu, "Clamp",        NodeType::Clamp);
     addEntry(mathMenu, "Abs",          NodeType::Abs);
-    addEntry(mathMenu, "Min",          NodeType::Min);
-    addEntry(mathMenu, "Max",          NodeType::Max);
     addEntry(mathMenu, "Modulo",       NodeType::Modulo);
     addEntry(mathMenu, "Greater Than", NodeType::GreaterThan);
     addEntry(mathMenu, "Less Than",    NodeType::LessThan);
@@ -386,6 +384,13 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     statefulMenu->addSeparator();
     addEntry(statefulMenu, "PID Controller",      NodeType::PIDController);
     addEntry(statefulMenu, "PID Advanced",        NodeType::PIDControllerAdvanced);
+
+    QMenu* funcMenu = addMenu->addMenu("Function");
+    addEntry(funcMenu, "Function (1 input)",      NodeType::Function1);
+    addEntry(funcMenu, "Function (3 inputs)",     NodeType::Function3);
+    addEntry(funcMenu, "Function (8 inputs)",     NodeType::Function8);
+    addEntry(funcMenu, "Bool Function (4 inputs)", NodeType::FunctionBool4);
+    addEntry(funcMenu, "Bool Function (8 inputs)", NodeType::FunctionBool8);
 
     menu.exec(mapToGlobal(viewPos));
 }

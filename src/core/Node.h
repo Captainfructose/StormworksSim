@@ -60,19 +60,29 @@ enum class NodeType {
     Divide,
     Clamp,
     Abs,
-    Min,
-    Max,
     Modulo,
+
+    // Comparison
     GreaterThan,
     LessThan,
     EqualTo,
+
+    // Stateful
     UpDownCounter,
+    MemoryRegister,
     TimerTON,
     TimerTOF,
     TimerRTO,
     TimerRTF,
     PIDController,
-    PIDControllerAdvanced
+    PIDControllerAdvanced,
+
+    // Function evaluator nodes
+    Function1,
+    Function3,
+    Function8,
+    FunctionBool4,
+    FunctionBool8
 };
 
 class Node {

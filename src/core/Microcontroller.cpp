@@ -3,6 +3,7 @@
 #include "nodes/CompositeNodes.h"
 #include "nodes/MathNodes.h"
 #include "nodes/StatefulNodes.h"
+#include "nodes/FunctionNodes.h"
 
 #include <QFile>
 #include <QTextStream>
@@ -272,6 +273,8 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         double pidKp = 0.0;
         double pidKi = 0.0;
         double pidKd = 0.0;
+        // Function node expression
+        QString expression;
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -336,6 +339,15 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         if (!maxElem.isNull())
             info.counterMax = maxElem.attribute("text", "0").toDouble();
 
+        // Memory Register / UpDownCounter reset value: <r text="X"/>
+        // For MemoryRegister this is the initial stored value.
+        // We reuse literalValue/hasLiteral since the structure is the same.
+        QDomElement rElem2 = obj.firstChildElement("r");
+        if (!rElem2.isNull() && !rElem2.attribute("text").isEmpty()) {
+            info.literalValue = rElem2.attribute("text", "0").toDouble();
+            info.hasLiteral   = true;
+        }
+
         // PID Controller gains: <kp text="X"/>, <ki text="X"/>, <kd text="X"/>
         QDomElement kpElem = obj.firstChildElement("kp");
         if (!kpElem.isNull())
@@ -346,6 +358,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         QDomElement kdElem = obj.firstChildElement("kd");
         if (!kdElem.isNull())
             info.pidKd = kdElem.attribute("text", "0").toDouble();
+
+        // Function node expression stored as e="..." attribute on <object>
+        if (obj.hasAttribute("e"))
+            info.expression = obj.attribute("e");
 
         // Inputs: <in1 component_id="X"/>, <in2 .../> etc.
         for (int port = 1; port <= 32; ++port) {
@@ -445,20 +461,33 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             eq->tolerance = info.literalValue;
         }
 
+        // Function evaluator nodes — set expression from e="" attribute
+        if (info.type == NodeType::Function1 || info.type == NodeType::Function3 ||
+            info.type == NodeType::Function8  || info.type == NodeType::FunctionBool4 ||
+            info.type == NodeType::FunctionBool8) {
+            FunctionNodeBase* fn = static_cast<FunctionNodeBase*>(n.get());
+            fn->expression = info.expression;
+        }
+
         // PID Controller — set gains from XML elements
         if (info.type == NodeType::PIDController) {
-            auto* pid = static_cast<PIDControllerNode*>(n.get());
+            PIDControllerNode* pid = static_cast<PIDControllerNode*>(n.get());
             pid->kp = info.pidKp;
             pid->ki = info.pidKi;
             pid->kd = info.pidKd;
         }
         if (info.type == NodeType::UpDownCounter) {
-            auto* ctr = static_cast<UpDownCounterNode*>(n.get());
+            UpDownCounterNode* ctr = static_cast<UpDownCounterNode*>(n.get());
             ctr->step         = info.counterStep;
             ctr->minVal       = info.counterMin;
             ctr->maxVal       = info.counterMax;
-            // In Stormworks, min/max of 0 means unclamped
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
+        }
+
+        // Memory Register — initial stored value from <r text="X"/>
+        if (info.type == NodeType::MemoryRegister && info.hasLiteral) {
+            MemoryRegisterNode* mem = static_cast<MemoryRegisterNode*>(n.get());
+            mem->setStored(info.literalValue);
         }
 
         // Composite packer — set channel count
@@ -559,11 +588,17 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case  7: return NodeType::Subtract;
         case  8: return NodeType::Multiply;
         case  9: return NodeType::Divide;
-        case 10: return NodeType::Clamp;
-        case 11: return NodeType::Abs;
-        case 12: return NodeType::Min;
-        case 13: return NodeType::Max;
-        case 14: return NodeType::Modulo;
+        case 11: return NodeType::Clamp;
+        case 13: return NodeType::MemoryRegister;
+        case 14: return NodeType::Abs;
+        case 38: return NodeType::Modulo;
+
+        // ── Function evaluator ────────────────────────────────────────────────
+        case 10: return NodeType::Function3;
+        case 36: return NodeType::Function8;
+        case 45: return NodeType::Function1;
+        case 46: return NodeType::FunctionBool4;
+        case 47: return NodeType::FunctionBool8;
 
         // ── Comparison ────────────────────────────────────────────────────────
         case 17: return NodeType::GreaterThan;
@@ -626,11 +661,16 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Subtract: return 7;
         case NodeType::Multiply: return 8;
         case NodeType::Divide:   return 9;
-        case NodeType::Clamp:    return 10;
-        case NodeType::Abs:      return 11;
-        case NodeType::Min:      return 12;
-        case NodeType::Max:      return 13;
-        case NodeType::Modulo:   return 14;
+        case NodeType::Clamp:    return 11;
+        case NodeType::Abs:      return 14;
+        case NodeType::Modulo:   return 38;
+
+        case NodeType::Function1:     return 45;
+        case NodeType::Function3:     return 10;
+        case NodeType::Function8:     return 36;
+        case NodeType::FunctionBool4: return 46;
+        case NodeType::FunctionBool8: return 47;
+        case NodeType::MemoryRegister: return 13;
 
         case NodeType::GreaterThan: return 17;
         case NodeType::LessThan:    return 18;
@@ -815,18 +855,28 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                             if (eElem.isNull()) { eElem = doc.createElement("e"); obj.appendChild(eElem); }
                             eElem.setAttribute("text", QString::number(eq->tolerance));
                             eElem.setAttribute("value", QString::number(eq->tolerance));
+                        } else if (liveNode->type == NodeType::Function1 ||
+                                   liveNode->type == NodeType::Function3 ||
+                                   liveNode->type == NodeType::Function8 ||
+                                   liveNode->type == NodeType::FunctionBool4 ||
+                                   liveNode->type == NodeType::FunctionBool8) {
+                            FunctionNodeBase* fn = static_cast<FunctionNodeBase*>(liveNode);
+                            if (!fn->expression.isEmpty())
+                                obj.setAttribute("e", fn->expression);
+                            else
+                                obj.removeAttribute("e");
                         } else if (liveNode->type == NodeType::PIDController) {
-                            auto* pid = static_cast<PIDControllerNode*>(liveNode);
-                            auto syncGain = [&](const QString& tag, double val) {
+                            PIDControllerNode* pid = static_cast<PIDControllerNode*>(liveNode);
+                            auto writeGainElem = [&](const QString& tag, double gainVal) {
                                 QDomElement el = obj.firstChildElement(tag);
                                 if (el.isNull()) { el = doc.createElement(tag); obj.appendChild(el); }
-                                el.setAttribute("text", QString::number(val));
+                                el.setAttribute("text", QString::number(gainVal));
                             };
-                            syncGain("kp", pid->kp);
-                            syncGain("ki", pid->ki);
-                            syncGain("kd", pid->kd);
+                            writeGainElem("kp", pid->kp);
+                            writeGainElem("ki", pid->ki);
+                            writeGainElem("kd", pid->kd);
                         } else if (liveNode->type == NodeType::UpDownCounter) {
-                            auto* ctr = static_cast<UpDownCounterNode*>(liveNode);
+                            UpDownCounterNode* ctr = static_cast<UpDownCounterNode*>(liveNode);
                             QDomElement rElem = obj.firstChildElement("r");
                             if (rElem.isNull()) { rElem = doc.createElement("r"); obj.appendChild(rElem); }
                             rElem.setAttribute("text", QString::number(ctr->resetValue));
@@ -887,6 +937,13 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 nElem.setAttribute("value", QString::number(lit->constantValue));
                 newObj.appendChild(nElem);
             }
+            if (nodePtr->type == NodeType::Function1 || nodePtr->type == NodeType::Function3 ||
+                nodePtr->type == NodeType::Function8  || nodePtr->type == NodeType::FunctionBool4 ||
+                nodePtr->type == NodeType::FunctionBool8) {
+                FunctionNodeBase* fn = static_cast<FunctionNodeBase*>(nodePtr.get());
+                if (!fn->expression.isEmpty())
+                    newObj.setAttribute("e", fn->expression);
+            }
             if (nodePtr->type == NodeType::EqualTo) {
                 auto* eq = static_cast<EqualToNode*>(nodePtr.get());
                 QDomElement eElem = doc.createElement("e");
@@ -921,6 +978,12 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 QDomElement maxElem = doc.createElement("max");
                 maxElem.setAttribute("text", QString::number(ctr->clampEnabled ? ctr->maxVal : 0.0));
                 newObj.appendChild(maxElem);
+            }
+            if (nodePtr->type == NodeType::MemoryRegister) {
+                // <r text="0"/> stores the initial/reset value
+                QDomElement rElem = doc.createElement("r");
+                rElem.setAttribute("text", "0");
+                newObj.appendChild(rElem);
             }
             if (nodePtr->type == NodeType::CompositeReadNumber) {
                 auto* rn = static_cast<CompositeReadNumberNode*>(nodePtr.get());
