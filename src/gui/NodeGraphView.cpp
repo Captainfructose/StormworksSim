@@ -169,6 +169,7 @@ void NodeGraphView::loadMicrocontroller(Microcontroller* mc)
         nodePtr->posY = (int)snapped.y();
 
         auto* item = new NodeGraphItem(nodePtr.get());
+        item->onLabelChanged = [this]() { emit labelsChanged(); };
         scene_->addItem(item);
         nodeItems_[id] = item;
     }
@@ -309,6 +310,7 @@ void NodeGraphView::addNodeAt(NodeType type, const QPointF& snappedScenePos)
     if (!rawNode) return;
 
     auto* item = new NodeGraphItem(rawNode);
+    item->onLabelChanged = [this]() { emit labelsChanged(); };
     scene_->addItem(item);
     nodeItems_[newId] = item;
 

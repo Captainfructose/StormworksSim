@@ -61,7 +61,7 @@ A composite wire carries **32 number channels and 32 bool channels**, numbered 1
 - A microcontroller built from scratch (nothing loaded) can be saved too — it starts from the empty skeleton Stormworks writes for a new microcontroller.
 - Files saved from this app load correctly in the Stormworks game.
 - **Node positions are saved.** Positions are converted back to Stormworks grid units (rounded to 0.25) so layouts carry over to the game.
-- **I/O connectors are fully saved:** new Bool/Number/Composite Input and Output nodes are written (component entry plus edge connector, in the first free board slot — the board grows by one row when full), and deleted ones are removed from both places.
+- **I/O connectors are fully saved:** new Bool/Number/Composite Input and Output nodes are written (component entry plus edge connector, in the first free board slot — the board grows by one row when full), and deleted ones are removed from both places. Deleting connectors also shrinks the board by any trailing row or column they emptied; slack you left in the board on purpose is kept.
 - **Connector labels** are loaded from and saved to the file. Edit one from the node's ⚙ dialog.
 - Wires from a node's **second or later output** (for example the `!Q` output of an SR Latch) are loaded and saved using the file's `node_index` attribute.
 - Lua scripts keep their line breaks and tabs through load and save.
@@ -169,7 +169,7 @@ The expression is edited in the node's ⚙ dialog, which lists the supported ope
 | Property Slider  | 19      | Named number with a minimum, maximum, step and value                             |
 | Property Toggle  | 33      | Named on/off switch                                                              |
 | Property Number  | 34      | Named number value                                                               |
-| Property Text    | 58      | Named text property (name only; it has no ports)                                 |
+| Property Text    | 58      | Named text property with a text value (it has no ports; used by Lua scripts)     |
 | Tooltip Number   | 43      | Shows a number input in the vehicle tooltip under a label                        |
 | Tooltip On/Off   | 44      | Shows a bool input in the tooltip as one of two texts                            |
 
@@ -191,7 +191,7 @@ The panel on the right side of the window shows all MC edge ports. Each row uses
 - **Composite outputs** - not shown in the panel (a composite has no single value).
 - **Video / Audio outputs** — not shown in the panel; the output node's grey panel shows its source.
 
-The panel is rebuilt when a file is loaded, so a connector label edited in a node's ⚙ dialog shows there the next time the microcontroller is loaded.
+The panel is rebuilt when a file is loaded or when nodes are added or removed. Renaming a connector label in a node's ⚙ dialog updates the matching row title straight away, without resetting any of the panel's controls.
 
 ---
 
@@ -278,13 +278,11 @@ StormworksSim/
 
 - **Lua scripts are not run.** A Lua Script node keeps, edits and saves its script, but its output composite stays empty. Running scripts would need an embedded Lua interpreter and the Stormworks `input`, `output` and `property` functions; `onDraw` and `screen` drawing cannot work without a monitor.
 - **Video and audio** are routing only: inputs, outputs and switchboxes work and save, but there is no picture or sound, and no other video/audio nodes.
-- **Property Text** saves only its name; where the game stores its text value is not known yet.
 - **Property Toggle** stores its on/off state as `v="true"` (absent when off) based on sample files; other property nodes' attribute names were also taken from samples.
 - **Binary conversions** treat channel 1 as the least significant bit of a signed 32-bit integer — check this against the game.
 - **Blinker** new nodes default to 0.5 s on / 0.5 s off; the in-game defaults are not confirmed.
 - **Board size:** the 80 × 48 board is an estimate, not the game's exact work-area size.
 - **Palette icons** are the same short text glyphs the nodes use, not the game's drawn icons.
-- Deleting I/O nodes does not shrink the board, and the I/O panel does not refresh when a connector label is renamed.
 - A few Stormworks nodes are still missing; each needs a sample file to get its type ID and settings.
 - The simulator's Composite Packer is not a Stormworks node and is not written to saved files.
 

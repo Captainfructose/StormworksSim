@@ -750,7 +750,7 @@ void NodeGraphItem::paint(QPainter* painter,
 
     // ── Property nodes: property name above the current value ─────────────────
     // The name is shown smaller and dimmer on the top line; the value (or
-    // ON/OFF for a toggle) sits below it. Property Text has only a name.
+    // ON/OFF for a toggle, the text for Property Text) sits below it.
     {
         QString name, value;
         bool    isProperty = true;
@@ -779,9 +779,12 @@ void NodeGraphItem::paint(QPainter* painter,
                 value = pt->value ? "ON" : "OFF";
                 break;
             }
-            case NodeType::PropertyText:
-                name = static_cast<PropertyTextNode*>(node_)->propertyName;
+            case NodeType::PropertyText: {
+                auto* pt = static_cast<PropertyTextNode*>(node_);
+                name  = pt->propertyName;
+                value = pt->text;   // empty text shows the name alone
                 break;
+            }
             default:
                 isProperty = false;
                 break;
@@ -1684,13 +1687,18 @@ void NodeGraphItem::openSettingsDialog()
     else if (node_->type == NodeType::PropertyText) {
         auto* pt = static_cast<PropertyTextNode*>(node_);
         layout->addWidget(new QLabel("Property Name:"));
-        auto* textEdit = new QLineEdit(pt->propertyName);
+        auto* nameEdit = new QLineEdit(pt->propertyName);
+        layout->addWidget(nameEdit);
+
+        layout->addWidget(new QLabel("Text:"));
+        auto* textEdit = new QLineEdit(pt->text);
         layout->addWidget(textEdit);
 
         auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
         layout->addWidget(buttons);
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
-            pt->propertyName = textEdit->text();
+            pt->propertyName = nameEdit->text();
+            pt->text         = textEdit->text();
             update();
             dialog.accept();
         });
@@ -1752,6 +1760,7 @@ void NodeGraphItem::openSettingsDialog()
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
             node_->label = labelEdit->text().trimmed();
             update();
+            if (onLabelChanged) onLabelChanged();
             dialog.accept();
         });
         QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);

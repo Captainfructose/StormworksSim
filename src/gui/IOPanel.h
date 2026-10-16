@@ -38,6 +38,10 @@ public:
     void refresh();
     void clearPanel();
 
+    // Re-reads every row's connector label from its node, without rebuilding the
+    // panel (so the controls keep the values they have)
+    void updateLabels();
+
 signals:
     void inputChanged();
 
@@ -69,6 +73,18 @@ private:
 
     // Composite channel controls — one entry per channel per CompositeInputNode
     std::vector<CompositeChannelControl>  compositeControls_;
+
+    // The title label of each row, by node id, with the text to show when the
+    // node has no connector label of its own — used by updateLabels()
+    struct RowLabel {
+        QLabel* widget;
+        QString fallback;
+    };
+    std::unordered_map<int, RowLabel> rowLabels_;
+
+    // Creates a row title showing the node's label (or `fallback`) and registers
+    // it so updateLabels() can refresh it later
+    QLabel* makeRowLabel(Node* n, const QString& fallback);
 
     void buildInputRow(BoolInputNode*     n);
     void buildInputRow(NumberInputNode*   n);

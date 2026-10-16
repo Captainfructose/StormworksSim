@@ -50,6 +50,11 @@ MainWindow::MainWindow(QWidget* parent)
         ioPanel_->loadMicrocontroller(mc_.get());
     });
 
+    // ── Renaming a connector only needs the panel's row titles refreshed ──────
+    connect(graphView_, &NodeGraphView::labelsChanged, this, [this]() {
+        ioPanel_->updateLabels();
+    });
+
     // ── Initialize the view with an empty microcontroller so the user can
     // start adding nodes immediately without needing to load a file first ──────
     graphView_->loadMicrocontroller(mc_.get());

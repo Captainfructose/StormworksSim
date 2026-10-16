@@ -92,6 +92,10 @@ signals:
     // IOPanel to rebuild its input/output controls.
     void nodeSetChanged();
 
+    // Emitted when a node's connector label is edited, so MainWindow can refresh
+    // the I/O panel's row titles without rebuilding it
+    void labelsChanged();
+
 protected:
     void resizeEvent      (QResizeEvent* event) override;
     void enterEvent       (QEnterEvent*  event) override;

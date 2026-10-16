@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QGraphicsItem>
+#include <functional>
 #include <QPointF>
 #include <QString>
 #include "../core/Node.h"
@@ -81,6 +82,10 @@ public:
 
     Node* node()   const { return node_; }
     int   nodeId() const { return node_->id; }
+
+    // Called after the node's connector label is edited in its ⚙ dialog, so the
+    // owner can refresh anything else that shows it (set by NodeGraphView)
+    std::function<void()> onLabelChanged;
 
     void refresh() { update(); }
 

@@ -369,6 +369,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         double  propStep  = 1.0;            // <int text="X"/> (slider step)
         QString textN;                      // n="..." (property name)
         bool    propBool = false;           // v="true" (property toggle)
+        QString valueText;                  // v="..." (property text's value)
         QString tipLabel = "value";         // l="..." (tooltips)
         QString tipOn    = "on";            // on="..." (tooltip on/off)
         QString tipOff   = "off";           // off="..."
@@ -488,7 +489,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             info.propStep = intElem.attribute("value", intElem.attribute("text", "1")).toDouble();
         if (obj.hasAttribute("script")) info.script = obj.attribute("script");
         if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
-        if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
+        if (obj.hasAttribute("v")) {
+            info.propBool  = (obj.attribute("v") == "true");
+            info.valueText = obj.attribute("v");
+        }
         if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
         if (obj.hasAttribute("on")) {
             info.tipOn   = obj.attribute("on");
@@ -681,8 +685,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             pt->value        = info.propBool;
         }
         if (info.type == NodeType::PropertyText) {
+            auto* pt = static_cast<PropertyTextNode*>(n.get());
             if (!info.textN.isEmpty())
-                static_cast<PropertyTextNode*>(n.get())->propertyName = info.textN;
+                pt->propertyName = info.textN;
+            pt->text = info.valueText;
         }
         if (info.type == NodeType::TooltipNumber) {
             static_cast<TooltipNumberNode*>(n.get())->tooltipLabel = info.tipLabel;
@@ -1230,9 +1236,13 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 else           obj.removeAttribute("v");
                 return true;
             }
-            case NodeType::PropertyText:
-                obj.setAttribute("n", static_cast<const PropertyTextNode*>(n)->propertyName);
+            case NodeType::PropertyText: {
+                auto* pt = static_cast<const PropertyTextNode*>(n);
+                obj.setAttribute("n", pt->propertyName);
+                if (pt->text.isEmpty()) obj.removeAttribute("v");
+                else                    obj.setAttribute("v", pt->text);
                 return true;
+            }
             case NodeType::TooltipNumber:
                 obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
                 return true;
@@ -1547,13 +1557,19 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             c = next;
         }
     }
+    // Board slots the deleted connectors occupied; used below to shrink the board
+    std::set<std::pair<int,int>> deletedSlots;
     if (!deletedBridgeIds.empty()) {
         QDomElement nodesEl = root.firstChildElement("nodes");
         QDomElement n = nodesEl.firstChildElement("n");
         while (!n.isNull()) {
             QDomElement nextN = n.nextSiblingElement("n");
-            if (deletedBridgeIds.count(n.attribute("component_id", "-1").toInt()))
+            if (deletedBridgeIds.count(n.attribute("component_id", "-1").toInt())) {
+                const QDomElement pos = n.firstChildElement("node").firstChildElement("position");
+                deletedSlots.insert({ pos.attribute("x", "0").toInt(),
+                                      pos.attribute("z", "0").toInt() });
                 nodesEl.removeChild(n);
+            }
             n = nextN;
         }
     }
@@ -1665,10 +1681,34 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         nodesElem.appendChild(n);
     }
 
-    if (!newBridgeIds.empty()) {
-        root.setAttribute("length", boardL); // may have grown to fit new connectors
+    // Shrink the board by any trailing row or column that deleting connectors
+    // just emptied. Only rows/columns a deleted connector was in are considered,
+    // so slack the user left in the board on purpose is not taken away.
+    auto lineUsed = [&](bool isRow, int index) {
+        const int span = isRow ? boardW : boardL;
+        for (int i = 0; i < span; ++i)
+            if (usedSlots.count(isRow ? std::make_pair(i, index) : std::make_pair(index, i)))
+                return true;
+        return false;
+    };
+    auto lineHadDeleted = [&](bool isRow, int index) {
+        for (const auto& s : deletedSlots)
+            if ((isRow ? s.second : s.first) == index) return true;
+        return false;
+    };
+    while (boardL > 1 && !lineUsed(true, boardL - 1) && lineHadDeleted(true, boardL - 1))
+        --boardL;
+    while (boardW > 1 && !lineUsed(false, boardW - 1) && lineHadDeleted(false, boardW - 1))
+        --boardW;
+
+    // Write back the board size if it changed (grown for new connectors, or shrunk)
+    if (boardL != root.attribute("length", "1").toInt())
+        root.setAttribute("length", boardL);
+    if (boardW != root.attribute("width", "1").toInt())
+        root.setAttribute("width", boardW);
+
+    if (!newBridgeIds.empty())
         root.setAttribute("id_counter_node", lastNodeId);
-    }
 
     // id_counter holds the highest component id in use; keep it ahead of every
     // node id this session created so the game never reuses one

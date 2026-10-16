@@ -130,8 +130,9 @@ public:
 // in[0]=Value, in[1]=Switch(bool) → out[0]=On path, out[1]=Off path.
 // The opposite of a switchbox: sends the value down the On path while Switch is
 // on and down the Off path otherwise; the path not chosen outputs 0.
-// Type 21 in Stormworks XML. (The input order mirrors the switchbox, which puts
-// its bool last — not yet confirmed against a wired sample file.)
+// Type 21 in Stormworks XML. Input order (Value in1, Switch in2) and output order
+// (On = first, Off = second via node_index="1") confirmed against a wired sample.
+// That the unchosen path outputs 0 is an assumption.
 class NumericalJunctionNode : public Node {
 public:
     NumericalJunctionNode() : Node(NodeType::NumericalJunction, "Junction") {
