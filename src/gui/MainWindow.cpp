@@ -89,6 +89,13 @@ void MainWindow::setupMenuBar()
     quitAct->setShortcut(QKeySequence::Quit);
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
+    // Add Node menu — the same categorized list as the right-click "Add Node".
+    // New nodes appear in the middle of the visible area.
+    QMenu* addNodeMenu = menuBar()->addMenu("&Add Node");
+    graphView_->populateAddNodeMenu(addNodeMenu, [this]() {
+        return graphView_->defaultSpawnPoint();
+    });
+
     // Simulation menu
     QMenu* simMenu = menuBar()->addMenu("&Simulation");
 

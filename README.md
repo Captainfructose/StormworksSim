@@ -10,8 +10,12 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 
 ### Node Graph Editor
 - Visual node graph canvas with a **40×40 pixel grid** that all nodes snap to
+- A **fixed-size board** (80 × 48 cells) like the game's editor: the grid stops at the board's edge, nodes can't be dragged off it, and panning and zoom are limited to it. The size is set by `kBoard…` constants in `NodeGraphView.h`.
 - **Pan** with middle-mouse drag, **zoom** with scroll wheel
-- **Right-click** anywhere on the canvas to add nodes via a categorized context menu
+- **Adding nodes**, three ways — all built from one shared node list (`NodeCatalog.h`):
+  - **Right-click** the canvas → Add Node: the node appears where you clicked
+  - **Add Node** in the menu bar: the node appears in the middle of the view
+  - **Tab** opens a **palette** of node tiles grouped by category, like the game's: click a tile to add it where the mouse was. A search box filters as you type (**Enter** adds the first match), and **Esc** or a click on the canvas closes it.
 - **Left-click drag** from an output port to wire nodes together
 - **Left-click** an occupied input port to detach and rewire an existing connection
 - Wire colors indicate signal type, and only matching types can be connected:
@@ -23,12 +27,13 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 - **Delete/Backspace** key removes the selected node along with all its connections
 - Right-click a node to delete it directly from the context menu
 - Nodes with settings have a **⚙** button in the header
+- Hover a port to see its **full label and type** in a tooltip (labels on the node itself are kept short)
 - Video and audio have not been implemented yet.
 
 ### Node Appearance
-- Every node is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a small title at the top left, like in the game. There is no header strip.
-- A grey **display panel** in the middle shows live state: bool indicators fill when true, number ports show their current value
-- **Math nodes show their live equation** in the panel instead of separate values, for example `3 + 4` over `= 7`, or `0 ≤ 12.5 ≤ 100` over `= ON` for Threshold
+- Nodes are **4 grid squares wide**, like in the game. Each is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a **bold** title at the top left. There is no header strip.
+- A grey **display panel** in the middle shows live state: bool indicators fill when true, number ports show their current value. The panel is normally 86 px wide and **shrinks automatically** (to at least 50 px) when a port label needs more room; labels that still don't fit are shortened with "…".
+- **Math nodes show their live equation on one line** in the panel instead of separate values, for example `3 + 4 = 7`, `3 > 2 → ON`, or `0 ≤ 12.5 ≤ 100 → ON` for Threshold. Values are **bold**, operators plain; the font shrinks to fit.
 - Property nodes show their **property name** above their current value in the panel
 - **SR Latch** and **JK Flip-Flop** use the game's layout more closely: icon with the node's letters, labelled ports, and no display panel
 - I/O nodes show their **connector label** as the title when one is set
@@ -103,7 +108,7 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Add                 | 6       | A + B                                                                |
 | Subtract            | 7       | A − B                                                                |
 | Multiply            | 8       | A × B                                                                |
-| Divide              | 9       | A ÷ B (IsError output goes true on divide-by-zero)                   |
+| Divide              | 9       | A ÷ B (the Err output goes true on divide-by-zero)                   |
 | Clamp               | 11      | Clamp value to [min, max] — bounds configurable via settings         |
 | Threshold           | 12      | True while min ≤ value ≤ max — bounds configurable via settings      |
 | Abs                 | 14      | Absolute value                                                       |
@@ -249,7 +254,9 @@ StormworksSim/
 │   │       └── FunctionNodes.h        # Function / Bool Function expression evaluators
 │   └── gui/
 │       ├── MainWindow.h / .cpp        # Main window, menus, file I/O, sim control
-│       ├── NodeGraphView.h / .cpp     # Canvas: grid, pan/zoom, wire dragging, context menu
+│       ├── NodeGraphView.h / .cpp     # Canvas: board, grid, pan/zoom, wire dragging, Add Node menus
+│       ├── NodeCatalog.h              # The shared list of addable nodes, by category
+│       ├── NodePalette.h / .cpp       # Tab palette: searchable tiles of node types
 │       ├── NodeGraphItem.h / .cpp     # Per-node visual: drawing, gate symbols, settings dialogs
 │       ├── ConnectionItem.h / .cpp    # Wire visual (straight line with arrows, color by type)
 │       └── IOPanel.h / .cpp           # Right-side I/O controls panel
@@ -270,7 +277,8 @@ StormworksSim/
 - **Property Toggle** stores its on/off state as `v="true"` (absent when off) based on sample files; other property nodes' attribute names were also taken from samples.
 - **Binary conversions** treat channel 1 as the least significant bit of a signed 32-bit integer — check this against the game.
 - **Blinker** new nodes default to 0.5 s on / 0.5 s off; the in-game defaults are not confirmed.
-- **Node spacing:** simulator nodes are wider than Stormworks nodes (6 grid cells against about 4), so layouts look more spread out in the game, and layouts loaded from the game can overlap here.
+- **Board size:** the 80 × 48 board is an estimate, not the game's exact work-area size.
+- **Palette icons** are the same short text glyphs the nodes use, not the game's drawn icons.
 - Deleting I/O nodes does not shrink the board, and the I/O panel does not refresh when a connector label is renamed.
 - A few Stormworks nodes are still missing; each needs a sample file to get its type ID and settings.
 - The simulator's Composite Packer is not a Stormworks node and is not written to saved files.

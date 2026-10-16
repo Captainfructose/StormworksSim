@@ -2,10 +2,10 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "Release/StormworksSim.exe"
+			"path" : "MinSizeRel/StormworksSim.exe"
 		},
 		{
-			"path" : "Release/StormworksSim.pdb"
+			"path" : "MinSizeRel/StormworksSim.pdb"
 		}
 	],
 	"backtrace" : 1,
@@ -45,13 +45,13 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 57,
+				"line" : 60,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 63,
+				"line" : 66,
 				"parent" : 0
 			},
 			{
@@ -173,7 +173,7 @@
 			{
 				"command" : 8,
 				"file" : 0,
-				"line" : 60,
+				"line" : 63,
 				"parent" : 0
 			}
 		]
@@ -204,7 +204,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD"
+					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -std:c++17 -MD"
 				},
 				{
 					"backtrace" : 2,
@@ -270,7 +270,7 @@
 			[
 				{
 					"backtrace" : 0,
-					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_Release"
+					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_MinSizeRel"
 				},
 				{
 					"backtrace" : 25,
@@ -332,7 +332,8 @@
 				10,
 				11,
 				12,
-				27
+				13,
+				30
 			]
 		}
 	],
@@ -348,7 +349,7 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -MD",
+				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -MD",
 				"role" : "flags"
 			},
 			{
@@ -437,14 +438,14 @@
 	[
 		{
 			"backtrace" : 0,
+			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 0,
 			"id" : "Qt6::moc::@6890427a1f51a3e7e1df"
 		},
 		{
 			"id" : "Qt6::rcc::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 0,
-			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
 		}
 	],
 	"paths" : 
@@ -471,21 +472,21 @@
 				10,
 				11,
 				12,
-				27
+				13,
+				30
 			]
 		},
 		{
 			"name" : "",
 			"sourceIndexes" : 
 			[
-				13
+				14
 			]
 		},
 		{
 			"name" : "Header Files",
 			"sourceIndexes" : 
 			[
-				14,
 				15,
 				16,
 				17,
@@ -497,14 +498,17 @@
 				23,
 				24,
 				25,
-				26
+				26,
+				27,
+				28,
+				29
 			]
 		},
 		{
 			"name" : "CMake Rules",
 			"sourceIndexes" : 
 			[
-				28
+				31
 			]
 		}
 	],
@@ -514,7 +518,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_Release.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_MinSizeRel.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -591,6 +595,12 @@
 		},
 		{
 			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/gui/NodePalette.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
 			"path" : "resources.qrc",
 			"sourceGroupIndex" : 1
 		},
@@ -660,10 +670,20 @@
 			"sourceGroupIndex" : 2
 		},
 		{
+			"backtrace" : 1,
+			"path" : "src/gui/NodePalette.h",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 1,
+			"path" : "src/gui/NodeCatalog.h",
+			"sourceGroupIndex" : 2
+		},
+		{
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_Release.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_MinSizeRel.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{

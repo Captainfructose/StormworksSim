@@ -538,6 +538,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphItem.cpp" />
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\ConnectionItem.cpp" />
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.cpp" />
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodePalette.cpp" />
     <None Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\resources.qrc">
     </None>
     <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\core\Node.h" />
@@ -553,6 +554,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeGraphItem.h" />
     <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\ConnectionItem.h" />
     <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.h" />
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodePalette.h" />
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeCatalog.h" />
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build_msvc\StormworksSim_autogen\EWIEGA46WW\qrc_resources_Debug.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</ExcludedFromBuild>

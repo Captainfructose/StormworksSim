@@ -269,7 +269,7 @@ QColor NodeGraphItem::headerColor() const
 // Stormworks draws a picture here; we use a compact text glyph per node type,
 // falling back to the first letters of the node's name.
 // ─────────────────────────────────────────────────────────────────────────────
-static QString iconGlyph(NodeType type, const QString& name)
+QString NodeGraphItem::iconGlyph(NodeType type, const QString& name)
 {
     switch (type) {
         // I/O bridge
@@ -1480,6 +1480,14 @@ void NodeGraphItem::openSettingsDialog()
         auto* dd = static_cast<PropertyDropdownNode*>(node_);
         dialog.setMinimumWidth(420);
 
+        // The app-wide dark stylesheet leaves a checked radio button's dot the same
+        // colour as its background, so the selected option looked missing.
+        dialog.setStyleSheet(dialog.styleSheet() +
+            "QRadioButton::indicator { width: 12px; height: 12px; border-radius: 8px;"
+            "  border: 2px solid #888; background: #1e1e1e; }"
+            "QRadioButton::indicator:hover { border-color: #ccc; }"
+            "QRadioButton::indicator:checked { border: 2px solid #00dd44; background: #00dd44; }");
+
         layout->addWidget(new QLabel("Property Name:"));
         auto* nameEdit = new QLineEdit(dd->propertyName);
         layout->addWidget(nameEdit);
@@ -1512,7 +1520,7 @@ void NodeGraphItem::openSettingsDialog()
             valueSpin->setRange(-1e9, 1e9);
             valueSpin->setDecimals(4);
             valueSpin->setValue(value);
-            auto* removeBtn = new QPushButton("✕");
+            auto* removeBtn = new QPushButton("×"); // plain × — ✕ isn't in the UI font
             removeBtn->setFixedWidth(28);
 
             rowLayout->addWidget(radio);

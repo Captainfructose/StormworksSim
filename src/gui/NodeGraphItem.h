@@ -51,6 +51,10 @@ public:
 
     explicit NodeGraphItem(Node* node, QGraphicsItem* parent = nullptr);
 
+    // The short glyph drawn in a node's grey icon square (also used by the Tab
+    // palette). Falls back to the first letters of `name` for unlisted types.
+    static QString iconGlyph(NodeType type, const QString& name);
+
     QRectF boundingRect() const override;
     void   paint(QPainter* painter,
                  const QStyleOptionGraphicsItem* option,

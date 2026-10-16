@@ -183,6 +183,7 @@ C:/Users/Stale/OneDrive/Documents/Programming\ Projects/C++\ Projects/Stormworks
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QHBoxLayout \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QLabel \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QMainWindow \
+  C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QMenu \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QPushButton \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QScrollArea \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QSlider \
@@ -202,6 +203,7 @@ C:/Users/Stale/OneDrive/Documents/Programming\ Projects/C++\ Projects/Stormworks
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qlayout.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qlayoutitem.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qmainwindow.h \
+  C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qmenu.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qpushbutton.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qscrollarea.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qsizepolicy.h \

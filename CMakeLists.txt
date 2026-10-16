@@ -31,6 +31,7 @@ set(SOURCES
     src/gui/NodeGraphItem.cpp
     src/gui/ConnectionItem.cpp
     src/gui/IOPanel.cpp
+    src/gui/NodePalette.cpp
 
     # Resources (icons etc.)
     resources.qrc
@@ -51,6 +52,8 @@ set(HEADERS
     src/gui/NodeGraphItem.h
     src/gui/ConnectionItem.h
     src/gui/IOPanel.h
+    src/gui/NodePalette.h
+    src/gui/NodeCatalog.h
 )
 
 # ── Executable ────────────────────────────────────────────────────────────────
