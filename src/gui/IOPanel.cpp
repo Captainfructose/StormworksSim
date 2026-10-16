@@ -158,7 +158,8 @@ void IOPanel::buildInputRow(BoolInputNode* n)
     auto* hl  = new QHBoxLayout(row);
     hl->setContentsMargins(2, 2, 2, 2);
 
-    auto* lbl = new QLabel(QString("Bool In %1").arg(n->channelIndex + 1));
+    auto* lbl = new QLabel(n->label.isEmpty() ? QString("Bool In %1").arg(n->channelIndex + 1)
+                                              : n->label);
     lbl->setStyleSheet("color: #ccc; font-size: 11px;");
     hl->addWidget(lbl);
     hl->addStretch();
@@ -202,7 +203,8 @@ void IOPanel::buildInputRow(NumberInputNode* n)
     auto* hl = new QHBoxLayout(topRow);
     hl->setContentsMargins(0, 0, 0, 0);
 
-    auto* lbl = new QLabel(QString("Num In %1").arg(n->channelIndex + 1));
+    auto* lbl = new QLabel(n->label.isEmpty() ? QString("Num In %1").arg(n->channelIndex + 1)
+                                              : n->label);
     lbl->setStyleSheet("color: #ccc; font-size: 11px;");
     hl->addWidget(lbl);
     hl->addStretch();
@@ -308,7 +310,8 @@ void IOPanel::buildCompositeInputBlock(CompositeInputNode* n)
     auto* headerHl  = new QHBoxLayout(headerRow);
     headerHl->setContentsMargins(0, 0, 0, 0);
 
-    auto* header = new QLabel(QString("Composite In %1").arg(nodeId));
+    auto* header = new QLabel(n->label.isEmpty() ? QString("Composite In %1").arg(nodeId)
+                                                 : n->label);
     header->setStyleSheet("color: #aa44dd; font-size: 11px; font-weight: bold;");
     headerHl->addWidget(header);
     headerHl->addStretch();
@@ -521,7 +524,8 @@ void IOPanel::buildOutputRow(BoolOutputNode* n)
     auto* hl  = new QHBoxLayout(row);
     hl->setContentsMargins(2, 2, 2, 2);
 
-    auto* lbl = new QLabel(QString("Bool Out %1").arg(n->channelIndex + 1));
+    auto* lbl = new QLabel(n->label.isEmpty() ? QString("Bool Out %1").arg(n->channelIndex + 1)
+                                              : n->label);
     lbl->setStyleSheet("color: #ccc; font-size: 11px;");
     hl->addWidget(lbl);
     hl->addStretch();
@@ -547,7 +551,8 @@ void IOPanel::buildOutputRow(NumberOutputNode* n)
     auto* hl  = new QHBoxLayout(row);
     hl->setContentsMargins(2, 2, 2, 2);
 
-    auto* lbl = new QLabel(QString("Num Out %1").arg(n->channelIndex + 1));
+    auto* lbl = new QLabel(n->label.isEmpty() ? QString("Num Out %1").arg(n->channelIndex + 1)
+                                              : n->label);
     lbl->setStyleSheet("color: #ccc; font-size: 11px;");
     hl->addWidget(lbl);
     hl->addStretch();

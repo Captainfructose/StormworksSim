@@ -490,6 +490,19 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         }
     }
 
+    // ── Edge connector labels ─────────────────────────────────────────────────
+    // <nodes><n component_id="X"><node label="..."> names each I/O connector.
+    std::unordered_map<int, QString> edgeLabels;
+    {
+        QDomElement nodesRoot = root.firstChildElement("nodes");
+        for (QDomElement n = nodesRoot.firstChildElement("n"); !n.isNull();
+             n = n.nextSiblingElement("n")) {
+            QDomElement nd = n.firstChildElement("node");
+            if (nd.hasAttribute("label"))
+                edgeLabels[n.attribute("component_id", "-1").toInt()] = nd.attribute("label");
+        }
+    }
+
     // ── Step 3: create Node objects ───────────────────────────────────────────
     for (auto& [compId, info] : allNodes) {
         auto n = Node::create(info.type);
@@ -497,6 +510,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         n->id   = compId;
         n->posX = info.px;
         n->posY = info.py;
+
+        // I/O bridge nodes carry their connector label
+        if (originalBridgeIds_.count(compId) && edgeLabels.count(compId))
+            n->label = edgeLabels.at(compId);
 
         // Number literal — set constant value
         if (info.type == NodeType::NumberLiteral && info.hasLiteral) {
@@ -1253,6 +1270,18 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                     if (nodes_.count(compId)) {
                         writePos(obj, compId);
                         rewriteInputs(obj, compId);
+                        // Label edits go to the matching edge connector in <nodes>
+                        const QString& label = nodes_.at(compId)->label;
+                        if (!label.isEmpty()) {
+                            QDomElement nodesEl = root.firstChildElement("nodes");
+                            for (QDomElement n = nodesEl.firstChildElement("n"); !n.isNull();
+                                 n = n.nextSiblingElement("n")) {
+                                if (n.attribute("component_id", "-1").toInt() == compId) {
+                                    n.firstChildElement("node").setAttribute("label", label);
+                                    break;
+                                }
+                            }
+                        }
                     } else {
                         deletedBridgeIds.insert(compId);
                         compBridge.removeChild(c);
@@ -1362,7 +1391,8 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         n.setAttribute("id", ++lastNodeId);
         n.setAttribute("component_id", id);
         QDomElement nd = doc.createElement("node");
-        nd.setAttribute("label", spec.isInput ? "Input" : "Output");
+        nd.setAttribute("label", !nodePtr->label.isEmpty() ? nodePtr->label
+                                 : QString(spec.isInput ? "Input" : "Output"));
         if (spec.isInput) nd.setAttribute("mode", "1");
         if (spec.nodeType) nd.setAttribute("type", spec.nodeType);
         nd.setAttribute("description", "The input signal to be processed.");

@@ -107,6 +107,11 @@ public:
     int posX = 0;
     int posY = 0;
 
+    // Connector label shown in Stormworks for I/O bridge nodes (Bool/Number/
+    // Composite Input/Output): the <node label="..."> in the file's <nodes>.
+    // Empty means "not set" — the node's type name / a default is used.
+    QString label;
+
     explicit Node(NodeType type, const QString& name)
         : type(type), name(name) {}
 

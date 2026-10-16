@@ -133,6 +133,12 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::TimerRTO:
         case NodeType::TimerRTF:
         case NodeType::PIDController:
+        case NodeType::BoolInput:
+        case NodeType::BoolOutput:
+        case NodeType::NumberInput:
+        case NodeType::NumberOutput:
+        case NodeType::CompositeInput:
+        case NodeType::CompositeOutput:
         case NodeType::Capacitor:
         case NodeType::Threshold:
         case NodeType::PropertyDropdown:
@@ -291,8 +297,9 @@ void NodeGraphItem::paint(QPainter* painter,
     painter->setPen(QColor(0x33, 0x33, 0x33));
     QRectF textRect = headerRect.adjusted(4, 0, hasSettings() ? -kGearSize - 4 : -4, 0);
     painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
-                      painter->fontMetrics().elidedText(node_->name, Qt::ElideRight,
-                                                        (int)textRect.width()));
+                      painter->fontMetrics().elidedText(
+                          node_->label.isEmpty() ? node_->name : node_->label,
+                          Qt::ElideRight, (int)textRect.width()));
 
     // ── Settings gear button ──────────────────────────────────────────────────
     if (hasSettings()) {
@@ -1201,6 +1208,27 @@ void NodeGraphItem::openSettingsDialog()
                 dd->items.push_back({ rows[i].label->text(), rows[i].value->value() });
                 if (rows[i].radio->isChecked()) dd->selected = i;
             }
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── I/O nodes: connector label ─────────────────────────────────────────────
+    // The name Stormworks shows for this input/output on the microcontroller.
+    else if (node_->type == NodeType::BoolInput  || node_->type == NodeType::BoolOutput ||
+             node_->type == NodeType::NumberInput || node_->type == NodeType::NumberOutput ||
+             node_->type == NodeType::CompositeInput || node_->type == NodeType::CompositeOutput) {
+        layout->addWidget(new QLabel("Label (shown in Stormworks):"));
+        auto* labelEdit = new QLineEdit(node_->label);
+        labelEdit->setPlaceholderText(node_->name);
+        layout->addWidget(labelEdit);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            node_->label = labelEdit->text().trimmed();
             update();
             dialog.accept();
         });
