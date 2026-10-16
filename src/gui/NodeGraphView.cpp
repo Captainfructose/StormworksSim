@@ -354,6 +354,8 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(compositeMenu, "Composite Write Number", NodeType::CompositeWriteNumber);
     addEntry(compositeMenu, "Composite Write Bool",   NodeType::CompositeWriteBool);
     addEntry(compositeMenu, "Composite Switchbox",    NodeType::CompositeSwitchbox);
+    addEntry(compositeMenu, "Binary to Number",       NodeType::BinaryToNumber);
+    addEntry(compositeMenu, "Number to Binary",       NodeType::NumberToBinary);
 
     QMenu* logicMenu = addMenu->addMenu("Logic");
     addEntry(logicMenu, "AND",  NodeType::And);
@@ -388,6 +390,7 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     QMenu* statefulMenu = addMenu->addMenu("Stateful");
     addEntry(statefulMenu, "Up/Down Counter",     NodeType::UpDownCounter);
     addEntry(statefulMenu, "Memory Register",     NodeType::MemoryRegister);
+    addEntry(statefulMenu, "Blinker",             NodeType::Blinker);
     statefulMenu->addSeparator();
     addEntry(statefulMenu, "TON Timer",           NodeType::TimerTON);
     addEntry(statefulMenu, "TOF Timer",           NodeType::TimerTOF);

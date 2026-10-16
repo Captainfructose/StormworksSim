@@ -309,6 +309,8 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         QString tipLabel = "value";         // l="..." (tooltips)
         QString tipOn    = "on";            // on="..." (tooltip on/off)
         QString tipOff   = "off";           // off="..."
+        double  blinkOn  = 0.5;             // on="seconds"  (blinker)
+        double  blinkOff = 0.5;             // off="seconds"
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -423,8 +425,14 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
         if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
         if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
-        if (obj.hasAttribute("on"))  info.tipOn   = obj.attribute("on");
-        if (obj.hasAttribute("off")) info.tipOff  = obj.attribute("off");
+        if (obj.hasAttribute("on")) {
+            info.tipOn   = obj.attribute("on");
+            info.blinkOn = obj.attribute("on").toDouble();
+        }
+        if (obj.hasAttribute("off")) {
+            info.tipOff   = obj.attribute("off");
+            info.blinkOff = obj.attribute("off").toDouble();
+        }
 
         // Capacitor charge/discharge times: ct="X" dt="Y" attributes on <object>
         if (obj.hasAttribute("ct"))
@@ -569,6 +577,13 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             ctr->minVal       = info.counterMin;
             ctr->maxVal       = info.counterMax;
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
+        }
+
+        // Blinker — on/off durations from the on="" and off="" attributes
+        if (info.type == NodeType::Blinker) {
+            auto* bl = static_cast<BlinkerNode*>(n.get());
+            bl->onTime  = std::clamp(info.blinkOn,  BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
+            bl->offTime = std::clamp(info.blinkOff, BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
         }
 
         // Property / tooltip nodes
@@ -793,6 +808,9 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         // ── Pulse nodes ───────────────────────────────────────────────────────
         case 28: return NodeType::PushToToggle;
         case 48: return NodeType::ToggleToPush;
+        case 27: return NodeType::Blinker;
+        case 54: return NodeType::NumberToBinary;
+        case 55: return NodeType::BinaryToNumber;
 
         // ── Composite ─────────────────────────────────────────────────────────
         case 29: return NodeType::CompositeReadBool;     // Composite Read (on/off)
@@ -872,6 +890,9 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::SRLatch:             return 24;
         case NodeType::JKFlipFlop:          return 25;
         case NodeType::Capacitor:           return 26;
+        case NodeType::Blinker:             return 27;
+        case NodeType::NumberToBinary:      return 54;
+        case NodeType::BinaryToNumber:      return 55;
         case NodeType::PushToToggle:        return 28;
         case NodeType::ToggleToPush:        return 48;
         case NodeType::CompositeReadBool:    return 29;
@@ -1126,6 +1147,12 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             case NodeType::TooltipNumber:
                 obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
                 return true;
+            case NodeType::Blinker: {
+                auto* bl = static_cast<const BlinkerNode*>(n);
+                obj.setAttribute("on",  QString::number(bl->onTime));
+                obj.setAttribute("off", QString::number(bl->offTime));
+                return true;
+            }
             case NodeType::TooltipOnOff: {
                 auto* tt = static_cast<const TooltipOnOffNode*>(n);
                 obj.setAttribute("l",   tt->tooltipLabel);

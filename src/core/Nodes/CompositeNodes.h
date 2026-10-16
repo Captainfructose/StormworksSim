@@ -134,6 +134,31 @@ public:
     }
 };
 
+// ── BINARY TO NUMBER ──────────────────────────────────────────────────────────
+// in[0]=Composite → out[0]=Number. Type 55 in Stormworks XML.
+// The simulator models a composite as a single carrier value, so the binary
+// channels and the number are the same value here: this passes it through.
+class BinaryToNumberNode : public Node {
+public:
+    BinaryToNumberNode() : Node(NodeType::BinaryToNumber, "Binary to Number") {
+        inputs  = { Port::makeNumber("Composite") };
+        outputs = { Port::makeNumber("Number") };
+    }
+    void evaluate() override { outputNumber(0, inputNumber(0)); }
+};
+
+// ── NUMBER TO BINARY ──────────────────────────────────────────────────────────
+// in[0]=Number → out[0]=Composite. Type 54 in Stormworks XML. Pass-through for
+// the same reason as BinaryToNumberNode.
+class NumberToBinaryNode : public Node {
+public:
+    NumberToBinaryNode() : Node(NodeType::NumberToBinary, "Number to Binary") {
+        inputs  = { Port::makeNumber("Number") };
+        outputs = { Port::makeNumber("Composite") };
+    }
+    void evaluate() override { outputNumber(0, inputNumber(0)); }
+};
+
 // ── COMPOSITE WRITE (NUMBER) ──────────────────────────────────────────────────
 // Port layout:
 //   input[0]  = Composite In  (the existing composite wire to merge onto)

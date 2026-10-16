@@ -59,7 +59,8 @@ void ConnectionItem::paint(QPainter* painter,
             srcNode->type == NodeType::CompositePacker ||
             srcNode->type == NodeType::CompositeWriteNumber ||
             srcNode->type == NodeType::CompositeWriteBool ||
-            srcNode->type == NodeType::CompositeSwitchbox) {
+            srcNode->type == NodeType::CompositeSwitchbox ||
+            srcNode->type == NodeType::NumberToBinary) {
             wireColor = QColor(0x80, 0x00, 0xff); // purple — composite
         } else if (sourcePort_ < (int)srcNode->outputs.size()) {
             if (srcNode->outputs[sourcePort_].type == PortType::Bool)

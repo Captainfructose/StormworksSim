@@ -140,6 +140,7 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::CompositeInput:
         case NodeType::CompositeOutput:
         case NodeType::Capacitor:
+        case NodeType::Blinker:
         case NodeType::Threshold:
         case NodeType::PropertyDropdown:
         case NodeType::PropertyNumber:
@@ -353,7 +354,9 @@ void NodeGraphItem::paint(QPainter* painter,
               node_->type == NodeType::CompositeReadBool) && !isOutput) ||
             (isWriteNode && isOutput) ||
             (isWriteNode && !isOutput && portIdx == 0) ||
-            (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIdx < 2));
+            (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIdx < 2)) ||
+            (node_->type == NodeType::BinaryToNumber && !isOutput) ||
+            (node_->type == NodeType::NumberToBinary && isOutput);
 
         if (isCompositeSide)
             return QColor(0x80, 0x00, 0xff);
@@ -815,7 +818,9 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
           node_->type == NodeType::CompositeReadBool) && !isOutput) ||
         (isWriteNode && isOutput) ||
         (isWriteNode && !isOutput && portIndex == 0) ||
-        (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIndex < 2));
+        (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIndex < 2)) ||
+        (node_->type == NodeType::BinaryToNumber && !isOutput) ||
+        (node_->type == NodeType::NumberToBinary && isOutput);
 
     if (isCompositeSide)
         return QColor(0x80, 0x00, 0xff); // purple — composite wire
@@ -1414,6 +1419,37 @@ void NodeGraphItem::openSettingsDialog()
 
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
             node_->label = labelEdit->text().trimmed();
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Blinker ────────────────────────────────────────────────────────────────
+    else if (node_->type == NodeType::Blinker) {
+        auto* bl = static_cast<BlinkerNode*>(node_);
+
+        layout->addWidget(new QLabel("On Time (seconds):"));
+        auto* onSpin = new QDoubleSpinBox;
+        onSpin->setRange(BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
+        onSpin->setDecimals(3);
+        onSpin->setSingleStep(0.1);
+        onSpin->setValue(bl->onTime);
+        layout->addWidget(onSpin);
+
+        layout->addWidget(new QLabel("Off Time (seconds):"));
+        auto* offSpin = new QDoubleSpinBox;
+        offSpin->setRange(BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
+        offSpin->setDecimals(3);
+        offSpin->setSingleStep(0.1);
+        offSpin->setValue(bl->offTime);
+        layout->addWidget(offSpin);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            bl->onTime  = onSpin->value();
+            bl->offTime = offSpin->value();
             update();
             dialog.accept();
         });

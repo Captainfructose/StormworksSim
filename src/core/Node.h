@@ -53,6 +53,8 @@ enum class NodeType {
     CompositeWriteNumber,
     CompositeWriteBool,
     CompositeSwitchbox,
+    BinaryToNumber,
+    NumberToBinary,
 
     // Logic
     And,
@@ -88,6 +90,7 @@ enum class NodeType {
     // Stateful
     UpDownCounter,
     MemoryRegister,
+    Blinker,
     TimerTON,
     TimerTOF,
     TimerRTO,
