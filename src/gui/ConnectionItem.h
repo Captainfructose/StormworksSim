@@ -2,6 +2,7 @@
 
 #include <QGraphicsItem>
 #include <QPointF>
+#include <QPainterPath>
 #include "../core/Connection.h"
 
 class NodeGraphItem;
@@ -23,6 +24,8 @@ public:
 
     // ── QGraphicsItem interface ───────────────────────────────────────────────
     QRectF boundingRect() const override;
+    // Empty shape: wires draw above nodes but must never intercept clicks
+    QPainterPath shape() const override { return QPainterPath(); }
     void   paint(QPainter* painter,
                  const QStyleOptionGraphicsItem* option,
                  QWidget* widget = nullptr) override;

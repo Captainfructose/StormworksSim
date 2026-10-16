@@ -34,6 +34,15 @@ public:
     static constexpr int kPadding    = 8;
     static constexpr int kGearSize   = 18; // settings button size
 
+    // Grey display panel in the middle of the node (see innerRect())
+    static constexpr qreal kInnerMarginX = kWidth * 0.32;
+    static constexpr qreal kInnerMarginY = 4.0;
+    static constexpr qreal kInnerCircleR = 4.0;
+    static constexpr qreal kInnerPad     = 5.0;
+    static constexpr qreal kInnerRingR   = kInnerCircleR - 1; // ring radius (centre line)
+    static constexpr qreal kInnerRingW   = 2.5;               // ring thickness
+    static constexpr qreal kGateLineW    = 2.5;               // logic gate symbol line width
+
     explicit NodeGraphItem(Node* node, QGraphicsItem* parent = nullptr);
 
     QRectF boundingRect() const override;
@@ -75,6 +84,8 @@ private:
     Node* node_;
 
     int    totalHeight() const;
+    QRectF  innerRect() const;
+    QPointF inputPortLocalPos(int idx) const; // circle inside the grey panel
     qreal  inputPortY (int idx) const;
     qreal  outputPortY(int idx) const;
     QColor headerColor() const;

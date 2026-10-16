@@ -48,6 +48,19 @@ public:
     }
 };
 
+// ── COMPOSITE OUTPUT (type 5 in components_bridge) ────────────────────────────
+// A composite wire leaving the MC to the vehicle. A pure sink: one purple input
+// port, no visible output. Like the other bridge nodes it is only ever edited
+// in place when saving (new ones are not written to <components_bridge>).
+class CompositeOutputNode : public Node {
+public:
+    CompositeOutputNode() : Node(NodeType::CompositeOutput, "Composite Output") {
+        inputs  = { Port::makeNumber("Composite") };
+        outputs = { Port::makeNumber("Value") }; // hidden; mirrors the other sink nodes
+    }
+    void evaluate() override { outputs[0].value = inputs[0].value; }
+};
+
 // ── COMPOSITE PACKER ─────────────────────────────────────────────────────────
 class CompositePackerNode : public Node {
 public:
@@ -101,6 +114,23 @@ public:
 
     void evaluate() override {
         outputBool(0, inputBool(0));
+    }
+};
+
+// ── COMPOSITE SWITCHBOX ───────────────────────────────────────────────────────
+// in[0]=Composite On, in[1]=Composite Off, in[2]=Switch(bool) → out[0]=Composite.
+// Passes through the On composite while Switch is on, otherwise the Off one.
+// Type 53 in Stormworks XML. Composite wires are modelled as a single carrier
+// value in this simulator (see CompositeWriteNumberNode below).
+class CompositeSwitchboxNode : public Node {
+public:
+    CompositeSwitchboxNode() : Node(NodeType::CompositeSwitchbox, "Comp. Switchbox") {
+        inputs  = { Port::makeNumber("Comp. On"), Port::makeNumber("Comp. Off"),
+                    Port::makeBool("Switch") };
+        outputs = { Port::makeNumber("Composite") };
+    }
+    void evaluate() override {
+        outputs[0].value = inputBool(2) ? inputs[0].value : inputs[1].value;
     }
 };
 

@@ -93,6 +93,57 @@ public:
     }
 };
 
+// ── THRESHOLD ─────────────────────────────────────────────────────────────────
+// Out = true while minBound <= Value <= maxBound. Type 12 in Stormworks XML
+// (<min text="X"/> and <max text="X" value="X"/>); new nodes default to 0..1.
+class ThresholdNode : public Node {
+public:
+    double minBound = 0.0;
+    double maxBound = 1.0;
+
+    ThresholdNode() : Node(NodeType::Threshold, "Threshold") {
+        inputs  = { Port::makeNumber("Value") };
+        outputs = { Port::makeBool("Out") };
+    }
+    void evaluate() override {
+        const double v = inputNumber(0);
+        outputBool(0, v >= minBound && v <= maxBound);
+    }
+};
+
+// ── NUMERICAL SWITCHBOX ───────────────────────────────────────────────────────
+// in[0]=On value, in[1]=Off value, in[2]=Switch(bool) → out[0]=Out.
+// Outputs the On value while Switch is on, otherwise the Off value.
+// Type 22 in Stormworks XML.
+class NumericalSwitchboxNode : public Node {
+public:
+    NumericalSwitchboxNode() : Node(NodeType::NumericalSwitchbox, "Switchbox") {
+        inputs  = { Port::makeNumber("On"), Port::makeNumber("Off"), Port::makeBool("Switch") };
+        outputs = { Port::makeNumber("Out") };
+    }
+    void evaluate() override {
+        outputNumber(0, inputBool(2) ? inputNumber(0) : inputNumber(1));
+    }
+};
+
+// ── DELTA ─────────────────────────────────────────────────────────────────────
+// Out = change in the input since the previous tick (current - previous).
+// The previous value starts at 0, so the first tick outputs the input itself.
+class DeltaNode : public Node {
+public:
+    DeltaNode() : Node(NodeType::Delta, "Delta") {
+        inputs  = { Port::makeNumber("Value") };
+        outputs = { Port::makeNumber("Out") };
+    }
+    void evaluate() override {
+        double current = inputNumber(0);
+        outputNumber(0, current - previous_);
+        previous_ = current;
+    }
+private:
+    double previous_ = 0.0;
+};
+
 // ── GREATER THAN ─────────────────────────────────────────────────────────────
 // Out = (A > B) — type 17
 class GreaterThanNode : public Node {
