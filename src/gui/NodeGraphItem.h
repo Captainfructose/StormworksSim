@@ -23,7 +23,8 @@ public:
     // Height starts at 2 cells (80px) for a single port row, then grows by
     // 1 cell (40px) for every 2 additional port rows — see totalHeight().
     static constexpr int kGridCell   = 40;
-    static constexpr int kWidth      = kGridCell * 6;  // 240
+    // Stormworks nodes are about 4 grid squares wide
+    static constexpr int kWidth      = kGridCell * 4;  // 160
     static constexpr int kHeaderH    = 28;
     // Used only as a label-sizing reference (text box height within a row);
     // actual port row spacing is computed dynamically in inputPortY/outputPortY
@@ -35,7 +36,12 @@ public:
     static constexpr int kGearSize   = 18; // settings button size
 
     // Grey display panel in the middle of the node (see innerRect())
-    static constexpr qreal kInnerMarginX = kWidth * 0.32;
+    // The grey panel keeps a fixed width and sits centred; whatever is left on
+    // each side holds the port rings and their (short) labels.
+    static constexpr qreal kInnerPanelW  = 86.4;
+    static constexpr qreal kInnerMarginX = (kWidth - kInnerPanelW) / 2.0;
+    // The panel shrinks to make room for long port labels, but not below this
+    static constexpr qreal kMinPanelW    = 50.0;
     static constexpr qreal kInnerMarginY = 4.0;
     static constexpr qreal kInnerCircleR = 4.0;
     static constexpr qreal kInnerPad     = 5.0;
@@ -80,11 +86,16 @@ protected:
     // Handle click on the settings gear button
     void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
+    // Port labels are shortened to fit the narrow node; hovering a port shows
+    // its full label as a tooltip
+    void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
+
 private:
     Node* node_;
 
     int    totalHeight() const;
     QRectF  innerRect() const;
+    void    panelMargins(qreal& left, qreal& right) const; // space beside the panel
     QPointF inputPortLocalPos(int idx) const; // circle inside the grey panel
     qreal  inputPortY (int idx) const;
     qreal  outputPortY(int idx) const;

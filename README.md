@@ -26,10 +26,12 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 - Video and audio have not been implemented yet.
 
 ### Node Appearance
-- White rounded nodes with a light header strip and a grey **display panel** that shows live state: bool indicators fill when true, number ports show their current value
+- Every node is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a small title at the top left, like in the game. There is no header strip.
+- A grey **display panel** in the middle shows live state: bool indicators fill when true, number ports show their current value
+- **Math nodes show their live equation** in the panel instead of separate values, for example `3 + 4` over `= 7`, or `0 ≤ 12.5 ≤ 100` over `= ON` for Threshold
 - Property nodes show their **property name** above their current value in the panel
-- **SR Latch** and **JK Flip-Flop** use the in-game look: a small grey icon with the node's letters, a small title, labelled ports, and no header strip or panel
-- I/O nodes show their **connector label** as the header title when one is set
+- **SR Latch** and **JK Flip-Flop** use the game's layout more closely: icon with the node's letters, labelled ports, and no display panel
+- I/O nodes show their **connector label** as the title when one is set
 
 ### Live Simulation
 - Tick-based simulation engine evaluating nodes in **topological order**.

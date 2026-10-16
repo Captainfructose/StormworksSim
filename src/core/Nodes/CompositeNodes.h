@@ -32,7 +32,7 @@ public:
     CompositeInputNode() : Node(NodeType::CompositeInput, "Composite Input") {
         // Default: one number channel at index 1
         channels = { { 1, PortType::Number } };
-        outputs  = { Port::makeComposite("Composite") };
+        outputs  = { Port::makeComposite("Out") };
     }
 
     void setChannels(const std::vector<CompositeChannel>& ch) { channels = ch; }
@@ -54,7 +54,7 @@ public:
 class CompositeOutputNode : public Node {
 public:
     CompositeOutputNode() : Node(NodeType::CompositeOutput, "Composite Output") {
-        inputs  = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeComposite("In") };
         outputs = { Port::makeComposite("Value") }; // hidden; mirrors the other sink nodes
     }
     void evaluate() override { outputComposite(0, inputComposite(0)); }
@@ -76,8 +76,8 @@ public:
         inputs.clear();
         for (int i = 0; i < count; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(i + 1)));
-        outputs = { Port::makeComposite("Composite") };
-        name = QString("Comp. Packer (%1ch)").arg(count);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Packer"; // the Ch1..ChN input labels already show the count
     }
 
     void evaluate() override {
@@ -127,9 +127,9 @@ public:
 class CompositeSwitchboxNode : public Node {
 public:
     CompositeSwitchboxNode() : Node(NodeType::CompositeSwitchbox, "Comp. Switchbox") {
-        inputs  = { Port::makeComposite("Comp. On"), Port::makeComposite("Comp. Off"),
+        inputs  = { Port::makeComposite("On"), Port::makeComposite("Off"),
                     Port::makeBool("Switch") };
-        outputs = { Port::makeComposite("Composite") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override {
         outputComposite(0, inputBool(2) ? inputComposite(0) : inputComposite(1));
@@ -143,8 +143,8 @@ public:
 class BinaryToNumberNode : public Node {
 public:
     BinaryToNumberNode() : Node(NodeType::BinaryToNumber, "Binary to Number") {
-        inputs  = { Port::makeComposite("Composite") };
-        outputs = { Port::makeNumber("Number") };
+        inputs  = { Port::makeComposite("In") };
+        outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {
         const CompositeData data = inputComposite(0);
@@ -162,8 +162,8 @@ public:
 class NumberToBinaryNode : public Node {
 public:
     NumberToBinaryNode() : Node(NodeType::NumberToBinary, "Number to Binary") {
-        inputs  = { Port::makeNumber("Number") };
-        outputs = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeNumber("In") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override {
         const double v = inputNumber(0);
@@ -187,8 +187,8 @@ public:
     QString script;
 
     LuaScriptNode() : Node(NodeType::LuaScript, "Lua Script") {
-        inputs  = { Port::makeComposite("Composite") };
-        outputs = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeComposite("In") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override { outputComposite(0, CompositeData{}); }
 };
@@ -233,11 +233,11 @@ public:
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeComposite("Composite In"));
+        inputs.push_back(Port::makeComposite("In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeComposite("Composite Out") };
-        name = QString("Comp. Write Num (%1ch @%2)").arg(channelCount).arg(startIndex);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Write Num"; // the Ch labels already show the channels
     }
 };
 
@@ -273,10 +273,10 @@ public:
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeComposite("Composite In"));
+        inputs.push_back(Port::makeComposite("In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeBool(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeComposite("Composite Out") };
-        name = QString("Comp. Write Bool (%1ch @%2)").arg(channelCount).arg(startIndex);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Write Bool"; // the Ch labels already show the channels
     }
 };

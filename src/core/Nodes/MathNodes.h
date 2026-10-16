@@ -41,7 +41,7 @@ class DivideNode : public Node {
 public:
     DivideNode() : Node(NodeType::Divide, "Divide") {
         inputs  = { Port::makeNumber("A"), Port::makeNumber("B") };
-        outputs = { Port::makeNumber("Out"), Port::makeBool("IsError") };
+        outputs = { Port::makeNumber("Out"), Port::makeBool("Err") };
     }
     void evaluate() override {
         double b = inputNumber(1);
@@ -60,7 +60,7 @@ public:
     double maxBound = 1.0;
 
     ClampNode() : Node(NodeType::Clamp, "Clamp") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {
@@ -73,7 +73,7 @@ public:
 class AbsNode : public Node {
 public:
     AbsNode() : Node(NodeType::Abs, "Abs") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override { outputNumber(0, std::abs(inputNumber(0))); }
@@ -102,7 +102,7 @@ public:
     double maxBound = 1.0;
 
     ThresholdNode() : Node(NodeType::Threshold, "Threshold") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeBool("Out") };
     }
     void evaluate() override {
@@ -132,7 +132,7 @@ public:
 class DeltaNode : public Node {
 public:
     DeltaNode() : Node(NodeType::Delta, "Delta") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {

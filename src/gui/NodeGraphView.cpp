@@ -23,7 +23,8 @@ NodeGraphView::NodeGraphView(QWidget* parent)
     setDragMode(QGraphicsView::NoDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     setResizeAnchor(QGraphicsView::AnchorUnderMouse);
-    setSceneRect(-10000, -10000, 20000, 20000);
+    // The scene is exactly the board; items and the view are confined to it
+    scene_->setSceneRect(boardRect());
     setMouseTracking(true);
 
     // Allow this widget to receive key events (Delete key for node removal)
@@ -31,34 +32,57 @@ NodeGraphView::NodeGraphView(QWidget* parent)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// drawBackground — faint grid lines at the snap interval
+// drawBackground — the board: teal grid inside, a dark margin outside it
 // ─────────────────────────────────────────────────────────────────────────────
 void NodeGraphView::drawBackground(QPainter* painter, const QRectF& rect)
 {
-    QGraphicsView::drawBackground(painter, rect);
+    const QRectF board = boardRect();
+
+    // Everything off the board is a flat dark colour
+    QPainterPath outside;
+    outside.addRect(rect);
+    QPainterPath boardPath;
+    boardPath.addRect(board);
+    painter->fillPath(outside.subtracted(boardPath), QColor(0x1f, 0x2a, 0x30));
+
+    // The board itself, and its grid lines (kept inside the board)
+    const QRectF area = rect.intersected(board);
+    if (area.isEmpty()) return;
+    painter->fillRect(area, backgroundBrush());
 
     QPen gridPen(QColor(0x46, 0x8c, 0xa0)); // darker teal, as in Stormworks
     gridPen.setWidth(0); // cosmetic, always 1px regardless of zoom
     painter->setPen(gridPen);
 
-    // Align the first line to the nearest grid boundary at or before rect's edge
-    qreal left = std::floor(rect.left() / kGridCellW) * kGridCellW;
-    qreal top  = std::floor(rect.top()  / kGridCellH) * kGridCellH;
+    // Align the first line to the nearest grid boundary at or before the edge
+    qreal left = std::floor(area.left() / kGridCellW) * kGridCellW;
+    qreal top  = std::floor(area.top()  / kGridCellH) * kGridCellH;
 
-    for (qreal x = left; x < rect.right(); x += kGridCellW)
-        painter->drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()));
+    for (qreal x = left; x <= area.right(); x += kGridCellW)
+        painter->drawLine(QPointF(x, area.top()), QPointF(x, area.bottom()));
 
-    for (qreal y = top; y < rect.bottom(); y += kGridCellH)
-        painter->drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y));
+    for (qreal y = top; y <= area.bottom(); y += kGridCellH)
+        painter->drawLine(QPointF(area.left(), y), QPointF(area.right(), y));
+
+    // A darker outline marks the edge of the board
+    QPen edgePen(QColor(0x2e, 0x66, 0x78));
+    edgePen.setWidth(0);
+    painter->setPen(edgePen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(board);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// snapToGrid — round a scene position to the nearest grid intersection
+// snapToGrid — round a scene position to the nearest grid intersection, kept on
+// the board so a node's top-left never lands outside it
 // ─────────────────────────────────────────────────────────────────────────────
 QPointF NodeGraphView::snapToGrid(const QPointF& scenePos) const
 {
+    const QRectF board = boardRect();
     qreal x = std::round(scenePos.x() / kGridCellW) * kGridCellW;
     qreal y = std::round(scenePos.y() / kGridCellH) * kGridCellH;
+    x = std::clamp(x, board.left(), board.right()  - kGridCellW);
+    y = std::clamp(y, board.top(),  board.bottom() - kGridCellH);
     return QPointF(x, y);
 }
 
@@ -344,10 +368,14 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(ioMenu, "Bool Output",     NodeType::BoolOutput);
     addEntry(ioMenu, "Number Input",    NodeType::NumberInput);
     addEntry(ioMenu, "Number Output",   NodeType::NumberOutput);
+    addEntry(ioMenu, "Composite Input",  NodeType::CompositeInput);
+    addEntry(ioMenu, "Composite Output", NodeType::CompositeOutput);
+
+    QMenu* constantsMenu = addMenu->addMenu("Constants");
+    addEntry(constantsMenu, "Constant Number", NodeType::NumberLiteral);
+    addEntry(constantsMenu, "Constant On",     NodeType::ConstantOn);
 
     QMenu* compositeMenu = addMenu->addMenu("Composite");
-    addEntry(compositeMenu, "Composite Input",       NodeType::CompositeInput);
-    addEntry(compositeMenu, "Composite Output",      NodeType::CompositeOutput);
     addEntry(compositeMenu, "Composite Packer",      NodeType::CompositePacker);
     addEntry(compositeMenu, "Composite Read Number", NodeType::CompositeReadNumber);
     addEntry(compositeMenu, "Composite Read Bool",   NodeType::CompositeReadBool);
@@ -365,7 +393,6 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(logicMenu, "XOR",  NodeType::Xor);
     addEntry(logicMenu, "NAND", NodeType::Nand);
     addEntry(logicMenu, "NOR",  NodeType::Nor);
-    addEntry(logicMenu, "Constant On", NodeType::ConstantOn);
     addEntry(logicMenu, "SR Latch",     NodeType::SRLatch);
     addEntry(logicMenu, "JK Flip-Flop", NodeType::JKFlipFlop);
     addEntry(logicMenu, "Capacitor",    NodeType::Capacitor);
@@ -383,7 +410,6 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(mathMenu, "Delta",        NodeType::Delta);
     addEntry(mathMenu, "Threshold",    NodeType::Threshold);
     addEntry(mathMenu, "Switchbox",    NodeType::NumericalSwitchbox);
-    addEntry(mathMenu, "Constant Number", NodeType::NumberLiteral);
     addEntry(mathMenu, "Greater Than", NodeType::GreaterThan);
     addEntry(mathMenu, "Less Than",    NodeType::LessThan);
     addEntry(mathMenu, "Equal To",     NodeType::EqualTo);
@@ -610,8 +636,17 @@ void NodeGraphView::keyPressEvent(QKeyEvent* event)
 void NodeGraphView::wheelEvent(QWheelEvent* event)
 {
     constexpr double kZoomFactor = 1.15;
-    if (event->angleDelta().y() > 0)
-        scale(kZoomFactor, kZoomFactor);
-    else
-        scale(1.0 / kZoomFactor, 1.0 / kZoomFactor);
+    constexpr double kMaxScale   = 4.0;
+
+    // Zooming out stops once the whole board fits in the window
+    const QRectF board = boardRect();
+    const double minScale = std::min(viewport()->width()  / board.width(),
+                                     viewport()->height() / board.height());
+
+    const double current = transform().m11();
+    double factor = (event->angleDelta().y() > 0) ? kZoomFactor : 1.0 / kZoomFactor;
+    const double target = std::clamp(current * factor, minScale, kMaxScale);
+    factor = target / current;
+    if (factor != 1.0)
+        scale(factor, factor);
 }

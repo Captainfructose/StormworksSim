@@ -57,6 +57,20 @@ public:
     static constexpr int kGridCellW = NodeGraphItem::kGridCell;
     static constexpr int kGridCellH = NodeGraphItem::kGridCell;
 
+    // ── Board size ─────────────────────────────────────────────────────────────
+    // Like the Stormworks editor, the work area is a fixed-size board: the grid
+    // stops at its edge, nodes can't be dragged off it, and zoom/pan are limited
+    // to it. Sizes are in grid cells; the board is placed so the area where
+    // loaded files put their nodes sits near the middle.
+    static constexpr int kBoardLeftCells = -32;
+    static constexpr int kBoardTopCells  = -20;
+    static constexpr int kBoardWCells    = 80;
+    static constexpr int kBoardHCells    = 48;
+    static QRectF boardRect() {
+        return QRectF(kBoardLeftCells * kGridCellW, kBoardTopCells * kGridCellH,
+                      kBoardWCells * kGridCellW,    kBoardHCells * kGridCellH);
+    }
+
 signals:
     // Emitted whenever a node is added or removed, so MainWindow can tell
     // IOPanel to rebuild its input/output controls.
