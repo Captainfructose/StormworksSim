@@ -74,3 +74,22 @@ target_link_libraries(StormworksSim PRIVATE
 if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(StormworksSim PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
+
+# ── Put the exe in the project root ───────────────────────────────────────────
+# The per-config variants keep Debug/Release builds from landing in subfolders.
+foreach(cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set_target_properties(StormworksSim PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_${cfg} ${CMAKE_SOURCE_DIR})
+endforeach()
+
+# Qt's DLLs and plugins must sit beside the exe, so deploy them after each build
+if(WIN32)
+    get_target_property(_qmake Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(_qtbin "${_qmake}" DIRECTORY)
+    find_program(WINDEPLOYQT windeployqt HINTS "${_qtbin}")
+    if(WINDEPLOYQT)
+        add_custom_command(TARGET StormworksSim POST_BUILD
+            COMMAND "${WINDEPLOYQT}" --no-translations "$<TARGET_FILE:StormworksSim>"
+            COMMENT "Deploying Qt runtime next to the exe")
+    endif()
+endif()

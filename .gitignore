@@ -1,0 +1,11 @@
+# Built exe and the Qt runtime deployed beside it (see CMakeLists.txt)
+/StormworksSim.exe
+/StormworksSim.pdb
+/*.dll
+/generic/
+/iconengines/
+/imageformats/
+/networkinformation/
+/platforms/
+/styles/
+/tls/
