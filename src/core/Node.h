@@ -9,7 +9,9 @@
 enum class PortType {
     Bool,
     Number,
-    Composite   // a bundle of 32 number channels and 32 bool channels
+    Composite,  // a bundle of 32 number channels and 32 bool channels
+    Video,      // a video signal; the simulator only tracks which source it comes from
+    Audio       // an audio signal; likewise just tracks its source
 };
 
 // ── CompositeData ─────────────────────────────────────────────────────────────
@@ -52,11 +54,20 @@ struct Port {
     static Port makeComposite(const QString& label) {
         return { label, PortType::Composite, QVariant::fromValue(CompositeData{}) };
     }
+    // A video/audio port's value is the name of the source feeding it (empty if none)
+    static Port makeVideo(const QString& label) {
+        return { label, PortType::Video, QString() };
+    }
+    static Port makeAudio(const QString& label) {
+        return { label, PortType::Audio, QString() };
+    }
 
     bool   asBool()   const { return value.toBool(); }
     double asNumber() const { return value.toDouble(); }
     // An unset port reads as an empty composite
     CompositeData asComposite() const { return value.value<CompositeData>(); }
+    QString       asVideo()     const { return value.toString(); }
+    QString       asAudio()     const { return value.toString(); }
 
     void set(bool   v) { value = v; }
     void set(double v) { value = v; }
@@ -81,6 +92,12 @@ enum class NodeType {
     // Composite
     CompositeInput,
     CompositeOutput,
+    VideoInput,
+    VideoOutput,
+    VideoSwitchbox,
+    AudioInput,
+    AudioOutput,
+    AudioSwitchbox,
     CompositePacker,
     CompositeReadNumber,
     CompositeReadBool,
@@ -116,6 +133,7 @@ enum class NodeType {
     Delta,
     Threshold,
     NumericalSwitchbox,
+    NumericalJunction,
 
     // Comparison
     GreaterThan,
@@ -168,6 +186,10 @@ public:
     double inputNumber(int idx) const { return inputs[idx].asNumber(); }
 
     CompositeData inputComposite(int idx) const { return inputs[idx].asComposite(); }
+    QString       inputVideo    (int idx) const { return inputs[idx].asVideo(); }
+    void outputVideo(int idx, const QString& source) { outputs[idx].value = source; }
+    QString       inputAudio    (int idx) const { return inputs[idx].asAudio(); }
+    void outputAudio(int idx, const QString& source) { outputs[idx].value = source; }
 
     void outputBool  (int idx, bool   v) { outputs[idx].set(v); }
     void outputNumber(int idx, double v) { outputs[idx].set(v); }

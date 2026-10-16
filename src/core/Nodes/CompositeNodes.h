@@ -60,6 +60,83 @@ public:
     void evaluate() override { outputComposite(0, inputComposite(0)); }
 };
 
+// ── VIDEO INPUT (type 6 in components_bridge) ─────────────────────────────────
+// A video signal coming into the MC. The simulator has no pictures: a video
+// "value" is just the name of the source, so a switchbox's routing is visible.
+class VideoInputNode : public Node {
+public:
+    VideoInputNode() : Node(NodeType::VideoInput, "Video Input") {
+        outputs = { Port::makeVideo("Out") };
+    }
+    void evaluate() override {
+        outputVideo(0, label.isEmpty() ? QString("Video In %1").arg(id) : label);
+    }
+};
+
+// ── VIDEO OUTPUT (type 7 in components_bridge) ────────────────────────────────
+// A video signal leaving the MC. A pure sink, like the other output nodes; its
+// panel shows which source is feeding it.
+class VideoOutputNode : public Node {
+public:
+    VideoOutputNode() : Node(NodeType::VideoOutput, "Video Output") {
+        inputs  = { Port::makeVideo("In") };
+        outputs = { Port::makeVideo("Value") }; // hidden; mirrors the other sink nodes
+    }
+    void evaluate() override { outputVideo(0, inputVideo(0)); }
+};
+
+// ── VIDEO SWITCHBOX ───────────────────────────────────────────────────────────
+// in[0]=Video On, in[1]=Video Off, in[2]=Switch(bool) → out[0]=Video.
+// Passes the On video through while Switch is on, otherwise the Off one.
+// Type 57 in Stormworks XML (input order mirrors the other switchboxes).
+class VideoSwitchboxNode : public Node {
+public:
+    VideoSwitchboxNode() : Node(NodeType::VideoSwitchbox, "Video Switchbox") {
+        inputs  = { Port::makeVideo("On"), Port::makeVideo("Off"), Port::makeBool("Switch") };
+        outputs = { Port::makeVideo("Out") };
+    }
+    void evaluate() override {
+        outputVideo(0, inputBool(2) ? inputVideo(0) : inputVideo(1));
+    }
+};
+
+// ── AUDIO INPUT (type 8 in components_bridge) ─────────────────────────────────
+// An audio signal coming into the MC; like video, its "value" is its source name.
+class AudioInputNode : public Node {
+public:
+    AudioInputNode() : Node(NodeType::AudioInput, "Audio Input") {
+        outputs = { Port::makeAudio("Out") };
+    }
+    void evaluate() override {
+        outputAudio(0, label.isEmpty() ? QString("Audio In %1").arg(id) : label);
+    }
+};
+
+// ── AUDIO OUTPUT (type 9 in components_bridge) ────────────────────────────────
+// An audio signal leaving the MC. A pure sink; its panel shows the source.
+class AudioOutputNode : public Node {
+public:
+    AudioOutputNode() : Node(NodeType::AudioOutput, "Audio Output") {
+        inputs  = { Port::makeAudio("In") };
+        outputs = { Port::makeAudio("Value") }; // hidden; mirrors the other sink nodes
+    }
+    void evaluate() override { outputAudio(0, inputAudio(0)); }
+};
+
+// ── AUDIO SWITCHBOX ───────────────────────────────────────────────────────────
+// in[0]=Audio On, in[1]=Audio Off, in[2]=Switch(bool) → out[0]=Audio.
+// Type 59 in Stormworks XML (input order mirrors the other switchboxes).
+class AudioSwitchboxNode : public Node {
+public:
+    AudioSwitchboxNode() : Node(NodeType::AudioSwitchbox, "Audio Switchbox") {
+        inputs  = { Port::makeAudio("On"), Port::makeAudio("Off"), Port::makeBool("Switch") };
+        outputs = { Port::makeAudio("Out") };
+    }
+    void evaluate() override {
+        outputAudio(0, inputBool(2) ? inputAudio(0) : inputAudio(1));
+    }
+};
+
 // ── COMPOSITE PACKER ─────────────────────────────────────────────────────────
 // Simulator-only helper (not a Stormworks node): number channels Ch1..ChN in,
 // one composite out with those numbers on channels 1..N.

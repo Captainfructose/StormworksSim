@@ -32,6 +32,10 @@ inline const std::vector<NodeCatalogEntry>& nodeCatalog()
         { "I/O", "Number Output",    NodeType::NumberOutput },
         { "I/O", "Composite Input",  NodeType::CompositeInput },
         { "I/O", "Composite Output", NodeType::CompositeOutput },
+        { "I/O", "Video Input",      NodeType::VideoInput },
+        { "I/O", "Video Output",     NodeType::VideoOutput },
+        { "I/O", "Audio Input",      NodeType::AudioInput },
+        { "I/O", "Audio Output",     NodeType::AudioOutput },
 
         // Constants
         { "Constants", "Constant Number", NodeType::NumberLiteral },
@@ -44,6 +48,8 @@ inline const std::vector<NodeCatalogEntry>& nodeCatalog()
         { "Composite", "Composite Write Number", NodeType::CompositeWriteNumber },
         { "Composite", "Composite Write Bool",   NodeType::CompositeWriteBool },
         { "Composite", "Composite Switchbox",    NodeType::CompositeSwitchbox },
+        { "Composite", "Video Switchbox",        NodeType::VideoSwitchbox },
+        { "Composite", "Audio Switchbox",        NodeType::AudioSwitchbox },
         { "Composite", "Lua Script",             NodeType::LuaScript },
         { "Composite", "Binary to Number",       NodeType::BinaryToNumber },
         { "Composite", "Number to Binary",       NodeType::NumberToBinary },
@@ -72,6 +78,7 @@ inline const std::vector<NodeCatalogEntry>& nodeCatalog()
         { "Math", "Delta",        NodeType::Delta },
         { "Math", "Threshold",    NodeType::Threshold },
         { "Math", "Switchbox",    NodeType::NumericalSwitchbox },
+        { "Math", "Junction",     NodeType::NumericalJunction },
         { "Math", "Greater Than", NodeType::GreaterThan },
         { "Math", "Less Than",    NodeType::LessThan },
         { "Math", "Equal To",     NodeType::EqualTo },

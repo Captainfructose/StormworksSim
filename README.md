@@ -28,7 +28,7 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 - Right-click a node to delete it directly from the context menu
 - Nodes with settings have a **⚙** button in the header
 - Hover a port to see its **full label and type** in a tooltip (labels on the node itself are kept short)
-- Video and audio have not been implemented yet.
+- Video and audio wires are **aqua** and **olive**. The simulator has no pictures or sound, so a video or audio signal is just the name of the source it comes from — a Video/Audio Output's panel shows which input is being routed to it.
 
 ### Node Appearance
 - Nodes are **4 grid squares wide**, like in the game. Each is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a **bold** title at the top left. There is no header strip.
@@ -83,6 +83,10 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Number Output    | 3           | Number signal going out from the MC                                   |
 | Composite Input  | 4           | Composite wire coming into the MC — channels set up in the I/O panel  |
 | Composite Output | 5           | Composite wire going out from the MC                                  |
+| Video Input      | 6           | Video signal coming into the MC                                       |
+| Video Output     | 7           | Video signal going out from the MC                                    |
+| Audio Input      | 8           | Audio signal coming into the MC                                       |
+| Audio Output     | 9           | Audio signal going out from the MC                                    |
 
 ### Logic
 |       Node       | Type ID |                       Description                        |
@@ -116,6 +120,7 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Greater Than        | 17      | A > B → bool                                                         |
 | Less Than           | 18      | A < B → bool                                                         |
 | Numerical Switchbox | 22      | On value / Off value / Switch → outputs the value the switch selects |
+| Numerical Junction  | 21      | Value / Switch → sends the value down the On or Off output (the other is 0) |
 | Delta               | 35      | Change in the input since the previous tick                          |
 | Modulo              | 38      | A mod B                                                              |
 | Equal To            | 42      | \|A − B\| ≤ tolerance → bool — tolerance configurable via settings  |
@@ -140,6 +145,8 @@ The expression is edited in the node's ⚙ dialog, which lists the supported ope
 | Number to Binary         | 54      | Number → the 32 bool channels of a composite (bits of a signed 32-bit integer)      |
 | Binary to Number         | 55      | The 32 bool channels of a composite → number                                        |
 | Lua Script               | 56      | Composite in/out with a script — stored and saved, **not executed**                 |
+| Video Switchbox          | 57      | Video On / Video Off / Switch → outputs the video the switch selects                |
+| Audio Switchbox          | 59      | Audio On / Audio Off / Switch → outputs the audio the switch selects                |
 | Composite Packer         | —       | Simulator-only helper: packs number inputs Ch1..ChN into one composite              |
 
 ### Stateful
@@ -176,15 +183,13 @@ The panel on the right side of the window shows all MC edge ports. Each row uses
 - **Bool inputs** — toggle button (click to flip ON/OFF).
 - **Number inputs** — spinbox + slider with configurable step size (shown below the slider).
 - **Composite inputs** — inline channel count, per-channel index, type (bool/number), and value control.
-- **Video inputs** - not implemented yet.
-- **Audio inputs** - not implemented yet.
+- **Video / Audio inputs** — not shown in the panel (there is nothing to set); they are connector nodes on the canvas.
 
 **Outputs:**
 - **Bool outputs** — indicator LED (green = ON, dark red = OFF)
 - **Number outputs** — live readout in cyan monospace text
 - **Composite outputs** - not shown in the panel (a composite has no single value).
-- **Video outputs** - not implemented yet.
-- **Audio outputs** - not implemented yet.
+- **Video / Audio outputs** — not shown in the panel; the output node's grey panel shows its source.
 
 The panel is rebuilt when a file is loaded, so a connector label edited in a node's ⚙ dialog shows there the next time the microcontroller is loaded.
 
@@ -272,7 +277,7 @@ StormworksSim/
 ## Known Limitations
 
 - **Lua scripts are not run.** A Lua Script node keeps, edits and saves its script, but its output composite stays empty. Running scripts would need an embedded Lua interpreter and the Stormworks `input`, `output` and `property` functions; `onDraw` and `screen` drawing cannot work without a monitor.
-- **Video and audio** signals are not implemented.
+- **Video and audio** are routing only: inputs, outputs and switchboxes work and save, but there is no picture or sound, and no other video/audio nodes.
 - **Property Text** saves only its name; where the game stores its text value is not known yet.
 - **Property Toggle** stores its on/off state as `v="true"` (absent when off) based on sample files; other property nodes' attribute names were also taken from samples.
 - **Binary conversions** treat channel 1 as the least significant bit of a signed 32-bit integer — check this against the game.

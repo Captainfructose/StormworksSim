@@ -26,6 +26,12 @@ std::unique_ptr<Node> Node::create(NodeType type)
         // ── Composite ─────────────────────────────────────────────────────────
         case NodeType::CompositeInput:       return std::make_unique<CompositeInputNode>();
         case NodeType::CompositeOutput:      return std::make_unique<CompositeOutputNode>();
+        case NodeType::VideoInput:           return std::make_unique<VideoInputNode>();
+        case NodeType::VideoOutput:          return std::make_unique<VideoOutputNode>();
+        case NodeType::VideoSwitchbox:       return std::make_unique<VideoSwitchboxNode>();
+        case NodeType::AudioInput:           return std::make_unique<AudioInputNode>();
+        case NodeType::AudioOutput:          return std::make_unique<AudioOutputNode>();
+        case NodeType::AudioSwitchbox:       return std::make_unique<AudioSwitchboxNode>();
         case NodeType::CompositePacker:      return std::make_unique<CompositePackerNode>();
         case NodeType::CompositeReadNumber:  return std::make_unique<CompositeReadNumberNode>();
         case NodeType::CompositeReadBool:    return std::make_unique<CompositeReadBoolNode>();
@@ -61,6 +67,7 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::Delta:               return std::make_unique<DeltaNode>();
         case NodeType::Threshold:           return std::make_unique<ThresholdNode>();
         case NodeType::NumericalSwitchbox:  return std::make_unique<NumericalSwitchboxNode>();
+        case NodeType::NumericalJunction:   return std::make_unique<NumericalJunctionNode>();
         case NodeType::GreaterThan:         return std::make_unique<GreaterThanNode>();
         case NodeType::LessThan:            return std::make_unique<LessThanNode>();
         case NodeType::EqualTo:             return std::make_unique<EqualToNode>();

@@ -538,6 +538,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             else if (typeStr == "3") ntype = NodeType::NumberOutput;   // number output (has input wire)
             else if (typeStr == "4") ntype = NodeType::CompositeInput; // composite input (source)
             else if (typeStr == "5") ntype = NodeType::CompositeOutput; // composite output (has input wire)
+            else if (typeStr == "6") ntype = NodeType::VideoInput;      // video input (source)
+            else if (typeStr == "7") ntype = NodeType::VideoOutput;     // video output (has input wire)
+            else if (typeStr == "8") ntype = NodeType::AudioInput;      // audio input (source)
+            else if (typeStr == "9") ntype = NodeType::AudioOutput;     // audio output (has input wire)
             else                     ntype = NodeType::BoolInput;      // no type = bool input (source)
 
             QDomElement obj = c.firstChildElement("object");
@@ -829,6 +833,7 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 13: return NodeType::MemoryRegister;
         case 12: return NodeType::Threshold;
         case 14: return NodeType::Abs;
+        case 21: return NodeType::NumericalJunction;
         case 22: return NodeType::NumericalSwitchbox;
         case 35: return NodeType::Delta;
         case 38: return NodeType::Modulo;
@@ -880,6 +885,8 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 27: return NodeType::Blinker;
         case 54: return NodeType::NumberToBinary;
         case 56: return NodeType::LuaScript;
+        case 57: return NodeType::VideoSwitchbox;
+        case 59: return NodeType::AudioSwitchbox;
         case 55: return NodeType::BinaryToNumber;
 
         // ── Composite ─────────────────────────────────────────────────────────
@@ -926,6 +933,7 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Clamp:    return 11;
         case NodeType::Abs:      return 14;
         case NodeType::Threshold:          return 12;
+        case NodeType::NumericalJunction:  return 21;
         case NodeType::NumericalSwitchbox: return 22;
         case NodeType::Delta:    return 35;
         case NodeType::Modulo:   return 38;
@@ -963,6 +971,8 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Blinker:             return 27;
         case NodeType::NumberToBinary:      return 54;
         case NodeType::LuaScript:           return 56;
+        case NodeType::VideoSwitchbox:      return 57;
+        case NodeType::AudioSwitchbox:      return 59;
         case NodeType::BinaryToNumber:      return 55;
         case NodeType::PushToToggle:        return 28;
         case NodeType::ToggleToPush:        return 48;
@@ -1051,6 +1061,10 @@ bool Microcontroller::saveToFileAs(const QString& path, QString& errorMsg)
             case NodeType::NumberOutput:
             case NodeType::CompositeInput:
             case NodeType::CompositeOutput:
+            case NodeType::VideoInput:
+            case NodeType::VideoOutput:
+            case NodeType::AudioInput:
+            case NodeType::AudioOutput:
                 originalBridgeIds_[id] = true;
                 break;
             default:
@@ -1153,6 +1167,10 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 case NodeType::NumberOutput:
                 case NodeType::CompositeInput:
                 case NodeType::CompositeOutput:
+                case NodeType::VideoInput:
+                case NodeType::VideoOutput:
+                case NodeType::AudioInput:
+                case NodeType::AudioOutput:
                     isBridge = true;
                     break;
                 default: break;
@@ -1559,6 +1577,10 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             case NodeType::NumberOutput:    out = { "3",     false, "1"     }; return true;
             case NodeType::CompositeInput:  out = { "4",     true,  "5"     }; return true;
             case NodeType::CompositeOutput: out = { "5",     false, "5"     }; return true;
+            case NodeType::VideoInput:      out = { "6",     true,  "6"     }; return true;
+            case NodeType::VideoOutput:     out = { "7",     false, "6"     }; return true;
+            case NodeType::AudioInput:      out = { "8",     true,  "7"     }; return true;
+            case NodeType::AudioOutput:     out = { "9",     false, "7"     }; return true;
             default: return false;
         }
     };

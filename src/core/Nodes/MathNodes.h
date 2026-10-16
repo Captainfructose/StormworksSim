@@ -126,6 +126,26 @@ public:
     }
 };
 
+// ── NUMERICAL JUNCTION ────────────────────────────────────────────────────────
+// in[0]=Value, in[1]=Switch(bool) → out[0]=On path, out[1]=Off path.
+// The opposite of a switchbox: sends the value down the On path while Switch is
+// on and down the Off path otherwise; the path not chosen outputs 0.
+// Type 21 in Stormworks XML. (The input order mirrors the switchbox, which puts
+// its bool last — not yet confirmed against a wired sample file.)
+class NumericalJunctionNode : public Node {
+public:
+    NumericalJunctionNode() : Node(NodeType::NumericalJunction, "Junction") {
+        inputs  = { Port::makeNumber("A"), Port::makeBool("Switch") };
+        outputs = { Port::makeNumber("On"), Port::makeNumber("Off") };
+    }
+    void evaluate() override {
+        const double v  = inputNumber(0);
+        const bool   on = inputBool(1);
+        outputNumber(0, on ? v   : 0.0);
+        outputNumber(1, on ? 0.0 : v);
+    }
+};
+
 // ── DELTA ─────────────────────────────────────────────────────────────────────
 // Out = change in the input since the previous tick (current - previous).
 // The previous value starts at 0, so the first tick outputs the input itself.

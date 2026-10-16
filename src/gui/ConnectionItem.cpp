@@ -57,6 +57,12 @@ void ConnectionItem::paint(QPainter* painter,
         && srcNode->outputs[sourcePort_].type == PortType::Composite) {
         wireColor = QColor(0x80, 0x00, 0xff); // purple — composite
     } else if (srcNode && sourcePort_ < (int)srcNode->outputs.size()
+               && srcNode->outputs[sourcePort_].type == PortType::Video) {
+        wireColor = QColor(0x00, 0xe6, 0xb4); // aqua — video
+    } else if (srcNode && sourcePort_ < (int)srcNode->outputs.size()
+               && srcNode->outputs[sourcePort_].type == PortType::Audio) {
+        wireColor = QColor(0x86, 0x9c, 0x00); // olive — audio
+    } else if (srcNode && sourcePort_ < (int)srcNode->outputs.size()
                && srcNode->outputs[sourcePort_].type == PortType::Bool) {
         wireColor = QColor(0xf0, 0x10, 0x50); // red — bool
     }

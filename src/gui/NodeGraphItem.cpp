@@ -207,6 +207,10 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::NumberOutput:
         case NodeType::CompositeInput:
         case NodeType::CompositeOutput:
+        case NodeType::VideoInput:
+        case NodeType::VideoOutput:
+        case NodeType::AudioInput:
+        case NodeType::AudioOutput:
         case NodeType::Capacitor:
         case NodeType::LuaScript:
         case NodeType::Blinker:
@@ -275,10 +279,16 @@ QString NodeGraphItem::iconGlyph(NodeType type, const QString& name)
         // I/O bridge
         case NodeType::BoolInput:
         case NodeType::NumberInput:
-        case NodeType::CompositeInput:       return "In";
+        case NodeType::CompositeInput:
+        case NodeType::VideoInput:
+        case NodeType::AudioInput:           return "In";
+        case NodeType::VideoSwitchbox:       return "VSw";
+        case NodeType::AudioSwitchbox:       return "ASw";
         case NodeType::BoolOutput:
         case NodeType::NumberOutput:
-        case NodeType::CompositeOutput:      return "Out";
+        case NodeType::CompositeOutput:
+        case NodeType::VideoOutput:
+        case NodeType::AudioOutput:          return "Out";
 
         // Logic
         case NodeType::And:                  return "&";
@@ -309,6 +319,7 @@ QString NodeGraphItem::iconGlyph(NodeType type, const QString& name)
         case NodeType::Threshold:            return "<x<";
         case NodeType::NumberLiteral:        return "#";
         case NodeType::NumericalSwitchbox:   return "⇄";       // ⇄
+        case NodeType::NumericalJunction:    return "Jn";
 
         // Function
         case NodeType::Function1:
@@ -417,6 +428,9 @@ static Equation equation(const Node* n)
         case NodeType::NumericalSwitchbox:
             return make({ V(onoff(n->inputs[2].asBool())), T(" ? "), in(0), T(" : "), in(1),
                           T(" = "), out0() });
+        case NodeType::NumericalJunction:
+            // "5 → On" / "5 → Off": which path the value is being sent down
+            return make({ in(0), T(" → "), V(n->inputs[1].asBool() ? "On" : "Off") });
         default:
             return {};
     }
@@ -571,6 +585,8 @@ void NodeGraphItem::paint(QPainter* painter,
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
+                         node_->type == NodeType::VideoInput ||
+                         node_->type == NodeType::AudioInput ||
                          node_->type == NodeType::NumberLiteral ||
                          node_->type == NodeType::PropertyDropdown ||
                          node_->type == NodeType::PropertyNumber ||
@@ -578,12 +594,16 @@ void NodeGraphItem::paint(QPainter* painter,
                          node_->type == NodeType::PropertyToggle);
     bool isSinkNode  = (node_->type == NodeType::BoolOutput  ||
                          node_->type == NodeType::NumberOutput ||
-                         node_->type == NodeType::CompositeOutput);
+                         node_->type == NodeType::CompositeOutput ||
+                         node_->type == NodeType::VideoOutput ||
+                         node_->type == NodeType::AudioOutput);
 
     // Helper: get port color based on type, port index, and direction.
     auto portColor = [](const Port& p, bool /*isOutput*/, int /*portIdx*/) -> QColor {
         switch (p.type) {
             case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple
+            case PortType::Video:     return QColor(0x00, 0xe6, 0xb4); // aqua
+            case PortType::Audio:     return QColor(0x86, 0x9c, 0x00); // olive
             case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red
             default:                  return QColor(0x00, 0xe0, 0x50); // green
         }
@@ -629,7 +649,9 @@ void NodeGraphItem::paint(QPainter* painter,
     // For logic gates these connect via lines to the gate body
     for (int i = 0; i < (int)node_->inputs.size() && !showEquation; ++i) {
         const Port& p  = node_->inputs[i];
-        if (p.type == PortType::Composite) continue; // no single value to show
+        if (p.type == PortType::Composite || p.type == PortType::Video ||
+            p.type == PortType::Audio)
+            continue; // no single value to show
         // These are display-only state indicators — the real input ports are the
         // rings on the node's left edge. Source/sink nodes show one centred
         // indicator (circle or value).
@@ -700,6 +722,22 @@ void NodeGraphItem::paint(QPainter* painter,
             painter->drawText(QRectF(x, y, w + 2, h), Qt::AlignVCenter | Qt::AlignLeft, s.text);
             x += w;
         }
+    }
+
+    // ── Video / Audio Output: show which source is feeding it ─────────────────
+    // (The simulator has no pictures or sound; the signal is just its source's name.)
+    if (node_->type == NodeType::VideoOutput || node_->type == NodeType::AudioOutput) {
+        QFont srcFont = painter->font();
+        srcFont.setPointSize(6);
+        painter->setFont(srcFont);
+        const QString source = node_->inputs[0].asVideo();
+        painter->setPen(QColor(0xdd, 0xdd, 0xdd));
+        painter->drawText(innerRect.adjusted(3, 0, -3, 0),
+                          Qt::AlignCenter | Qt::TextWordWrap,
+                          source.isEmpty() ? QString("no signal")
+                                           : painter->fontMetrics().elidedText(
+                                                 source, Qt::ElideMiddle,
+                                                 (int)innerRect.width() * 2 - 12));
     }
 
     // ── Constant Number: show the configured value in the grey panel ──────────
@@ -777,7 +815,9 @@ void NodeGraphItem::paint(QPainter* painter,
     for (int i = 0; i < (int)node_->outputs.size() && !isSourceNode && !isSinkNode
                     && !showEquation; ++i) {
         const Port& p  = node_->outputs[i];
-        if (p.type == PortType::Composite) continue; // no single value to show
+        if (p.type == PortType::Composite || p.type == PortType::Video ||
+            p.type == PortType::Audio)
+            continue; // no single value to show
         // For logic gates, always center the single output circle vertically
         qreal cy = isLogicGate ? innerRect.center().y()
                                : innerRect.top() + i * rowH + rowH * 0.5;
@@ -1019,6 +1059,8 @@ bool NodeGraphItem::inputPortsVisible() const
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
+                         node_->type == NodeType::VideoInput ||
+                         node_->type == NodeType::AudioInput ||
                          node_->type == NodeType::NumberLiteral ||
                          node_->type == NodeType::PropertyDropdown ||
                          node_->type == NodeType::PropertyNumber ||
@@ -1031,7 +1073,9 @@ bool NodeGraphItem::outputPortsVisible() const
 {
     bool isSinkNode = (node_->type == NodeType::BoolOutput  ||
                        node_->type == NodeType::NumberOutput ||
-                       node_->type == NodeType::CompositeOutput);
+                       node_->type == NodeType::CompositeOutput ||
+                       node_->type == NodeType::VideoOutput ||
+                       node_->type == NodeType::AudioOutput);
     return !isSinkNode;
 }
 
@@ -1091,6 +1135,8 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
 
     switch (p.type) {
         case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple — composite wire
+        case PortType::Video:     return QColor(0x00, 0xe6, 0xb4); // aqua — video wire
+        case PortType::Audio:     return QColor(0x86, 0x9c, 0x00); // olive — audio wire
         case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red — bool
         default:                  return QColor(0x00, 0xe0, 0x50); // green — number
     }
@@ -1692,7 +1738,9 @@ void NodeGraphItem::openSettingsDialog()
     // The name Stormworks shows for this input/output on the microcontroller.
     else if (node_->type == NodeType::BoolInput  || node_->type == NodeType::BoolOutput ||
              node_->type == NodeType::NumberInput || node_->type == NodeType::NumberOutput ||
-             node_->type == NodeType::CompositeInput || node_->type == NodeType::CompositeOutput) {
+             node_->type == NodeType::CompositeInput || node_->type == NodeType::CompositeOutput ||
+             node_->type == NodeType::VideoInput || node_->type == NodeType::VideoOutput ||
+             node_->type == NodeType::AudioInput || node_->type == NodeType::AudioOutput) {
         layout->addWidget(new QLabel("Label (shown in Stormworks):"));
         auto* labelEdit = new QLineEdit(node_->label);
         labelEdit->setPlaceholderText(node_->name);
