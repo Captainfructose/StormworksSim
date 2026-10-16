@@ -142,6 +142,12 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::Capacitor:
         case NodeType::Threshold:
         case NodeType::PropertyDropdown:
+        case NodeType::PropertyNumber:
+        case NodeType::PropertySlider:
+        case NodeType::PropertyToggle:
+        case NodeType::PropertyText:
+        case NodeType::TooltipNumber:
+        case NodeType::TooltipOnOff:
         case NodeType::Function1:
         case NodeType::Function3:
         case NodeType::Function8:
@@ -326,7 +332,10 @@ void NodeGraphItem::paint(QPainter* painter,
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
                          node_->type == NodeType::NumberLiteral ||
-                         node_->type == NodeType::PropertyDropdown);
+                         node_->type == NodeType::PropertyDropdown ||
+                         node_->type == NodeType::PropertyNumber ||
+                         node_->type == NodeType::PropertySlider ||
+                         node_->type == NodeType::PropertyToggle);
     bool isSinkNode  = (node_->type == NodeType::BoolOutput  ||
                          node_->type == NodeType::NumberOutput ||
                          node_->type == NodeType::CompositeOutput);
@@ -426,12 +435,66 @@ void NodeGraphItem::paint(QPainter* painter,
                           QString::number(lit->constantValue, 'g', 8));
     }
 
-    // ── Property Dropdown: show the selected option's value ──────────────────
-    if (node_->type == NodeType::PropertyDropdown) {
-        auto* dd = static_cast<PropertyDropdownNode*>(node_);
-        painter->setPen(Qt::white);
-        painter->drawText(innerRect, Qt::AlignCenter,
-                          QString::number(dd->selectedValue(), 'g', 8));
+    // ── Property nodes: property name above the current value ─────────────────
+    // The name is shown smaller and dimmer on the top line; the value (or
+    // ON/OFF for a toggle) sits below it. Property Text has only a name.
+    {
+        QString name, value;
+        bool    isProperty = true;
+        switch (node_->type) {
+            case NodeType::PropertyDropdown: {
+                auto* dd = static_cast<PropertyDropdownNode*>(node_);
+                name  = dd->propertyName;
+                value = QString::number(dd->selectedValue(), 'g', 8);
+                break;
+            }
+            case NodeType::PropertyNumber: {
+                auto* pn = static_cast<PropertyNumberNode*>(node_);
+                name  = pn->propertyName;
+                value = QString::number(pn->value, 'g', 8);
+                break;
+            }
+            case NodeType::PropertySlider: {
+                auto* ps = static_cast<PropertySliderNode*>(node_);
+                name  = ps->propertyName;
+                value = QString::number(ps->value, 'g', 8);
+                break;
+            }
+            case NodeType::PropertyToggle: {
+                auto* pt = static_cast<PropertyToggleNode*>(node_);
+                name  = pt->propertyName;
+                value = pt->value ? "ON" : "OFF";
+                break;
+            }
+            case NodeType::PropertyText:
+                name = static_cast<PropertyTextNode*>(node_)->propertyName;
+                break;
+            default:
+                isProperty = false;
+                break;
+        }
+
+        if (isProperty) {
+            const QFontMetrics fm(painter->font());
+            const QRectF nameRect(innerRect.left() + 3, innerRect.top() + 2,
+                                  innerRect.width() - 6, innerRect.height() * 0.5 - 2);
+            const QRectF valueRect(innerRect.left() + 3, innerRect.center().y(),
+                                   innerRect.width() - 6, innerRect.height() * 0.5 - 2);
+
+            if (value.isEmpty()) {
+                // Name only: use the whole panel
+                painter->setPen(Qt::white);
+                painter->drawText(innerRect.adjusted(3, 0, -3, 0), Qt::AlignCenter,
+                                  fm.elidedText(name, Qt::ElideRight, (int)innerRect.width() - 6));
+            } else {
+                painter->setPen(QColor(0xdd, 0xdd, 0xdd));
+                painter->drawText(nameRect, Qt::AlignCenter,
+                                  fm.elidedText(name, Qt::ElideRight, (int)nameRect.width()));
+                painter->setPen(Qt::white);
+                painter->drawText(valueRect, Qt::AlignCenter,
+                                  fm.elidedText(value, Qt::ElideRight, (int)valueRect.width()));
+            }
+        }
     }
 
     // ── Output circles (right side of inner rect) ─────────────────────────────
@@ -672,7 +735,10 @@ bool NodeGraphItem::inputPortsVisible() const
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
                          node_->type == NodeType::NumberLiteral ||
-                         node_->type == NodeType::PropertyDropdown);
+                         node_->type == NodeType::PropertyDropdown ||
+                         node_->type == NodeType::PropertyNumber ||
+                         node_->type == NodeType::PropertySlider ||
+                         node_->type == NodeType::PropertyToggle);
     return !isSourceNode;
 }
 
@@ -1207,6 +1273,125 @@ void NodeGraphItem::openSettingsDialog()
             for (int i = 0; i < (int)rows.size(); ++i) {
                 dd->items.push_back({ rows[i].label->text(), rows[i].value->value() });
                 if (rows[i].radio->isChecked()) dd->selected = i;
+            }
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Property Number / Slider / Toggle ──────────────────────────────────────
+    else if (node_->type == NodeType::PropertyNumber ||
+             node_->type == NodeType::PropertySlider ||
+             node_->type == NodeType::PropertyToggle) {
+        // Each kind has a name; Number/Slider have a value; Slider has range+step;
+        // Toggle has an on/off state. Widgets are created per kind below.
+        QString* nameRef = nullptr;
+        if      (node_->type == NodeType::PropertyNumber) nameRef = &static_cast<PropertyNumberNode*>(node_)->propertyName;
+        else if (node_->type == NodeType::PropertySlider) nameRef = &static_cast<PropertySliderNode*>(node_)->propertyName;
+        else                                              nameRef = &static_cast<PropertyToggleNode*>(node_)->propertyName;
+
+        layout->addWidget(new QLabel("Property Name:"));
+        auto* nameEdit = new QLineEdit(*nameRef);
+        layout->addWidget(nameEdit);
+
+        auto makeSpin = [&](const QString& label, double v) {
+            layout->addWidget(new QLabel(label));
+            auto* s = new QDoubleSpinBox;
+            s->setRange(-1e9, 1e9);
+            s->setDecimals(4);
+            s->setValue(v);
+            layout->addWidget(s);
+            return s;
+        };
+
+        QDoubleSpinBox *valueSpin = nullptr, *minSpin = nullptr, *maxSpin = nullptr, *stepSpin = nullptr;
+        QCheckBox* onCheck = nullptr;
+
+        if (node_->type == NodeType::PropertyNumber) {
+            valueSpin = makeSpin("Value:", static_cast<PropertyNumberNode*>(node_)->value);
+        } else if (node_->type == NodeType::PropertySlider) {
+            auto* ps = static_cast<PropertySliderNode*>(node_);
+            minSpin   = makeSpin("Minimum:", ps->minValue);
+            maxSpin   = makeSpin("Maximum:", ps->maxValue);
+            stepSpin  = makeSpin("Step:",    ps->step);
+            valueSpin = makeSpin("Value:",   ps->value);
+        } else {
+            onCheck = new QCheckBox("On");
+            onCheck->setChecked(static_cast<PropertyToggleNode*>(node_)->value);
+            layout->addWidget(onCheck);
+        }
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            *nameRef = nameEdit->text();
+            if (node_->type == NodeType::PropertyNumber) {
+                static_cast<PropertyNumberNode*>(node_)->value = valueSpin->value();
+            } else if (node_->type == NodeType::PropertySlider) {
+                auto* ps = static_cast<PropertySliderNode*>(node_);
+                ps->minValue = minSpin->value();
+                ps->maxValue = maxSpin->value();
+                ps->step     = stepSpin->value();
+                // Keep the value inside the range
+                ps->value    = std::clamp(valueSpin->value(), ps->minValue, ps->maxValue);
+            } else {
+                static_cast<PropertyToggleNode*>(node_)->value = onCheck->isChecked();
+            }
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Property Text ──────────────────────────────────────────────────────────
+    else if (node_->type == NodeType::PropertyText) {
+        auto* pt = static_cast<PropertyTextNode*>(node_);
+        layout->addWidget(new QLabel("Property Name:"));
+        auto* textEdit = new QLineEdit(pt->propertyName);
+        layout->addWidget(textEdit);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            pt->propertyName = textEdit->text();
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Tooltip Number / Tooltip On-Off ────────────────────────────────────────
+    else if (node_->type == NodeType::TooltipNumber || node_->type == NodeType::TooltipOnOff) {
+        const bool isOnOff = (node_->type == NodeType::TooltipOnOff);
+        QString& labelRef = isOnOff ? static_cast<TooltipOnOffNode*>(node_)->tooltipLabel
+                                    : static_cast<TooltipNumberNode*>(node_)->tooltipLabel;
+
+        layout->addWidget(new QLabel("Label:"));
+        auto* labelEdit = new QLineEdit(labelRef);
+        layout->addWidget(labelEdit);
+
+        QLineEdit* onEdit  = nullptr;
+        QLineEdit* offEdit = nullptr;
+        if (isOnOff) {
+            auto* tt = static_cast<TooltipOnOffNode*>(node_);
+            layout->addWidget(new QLabel("Text when on:"));
+            onEdit = new QLineEdit(tt->onText);
+            layout->addWidget(onEdit);
+            layout->addWidget(new QLabel("Text when off:"));
+            offEdit = new QLineEdit(tt->offText);
+            layout->addWidget(offEdit);
+        }
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            labelRef = labelEdit->text();
+            if (isOnOff) {
+                auto* tt = static_cast<TooltipOnOffNode*>(node_);
+                tt->onText  = onEdit->text();
+                tt->offText = offEdit->text();
             }
             update();
             dialog.accept();

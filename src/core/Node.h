@@ -37,6 +37,12 @@ enum class NodeType {
     NumberOutput,
     NumberLiteral,
     PropertyDropdown,
+    PropertyNumber,
+    PropertySlider,
+    PropertyToggle,
+    PropertyText,
+    TooltipNumber,
+    TooltipOnOff,
 
     // Composite
     CompositeInput,

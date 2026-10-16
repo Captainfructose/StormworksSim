@@ -301,6 +301,14 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         int     dropSelected = 0;
         std::vector<std::pair<QString, double>> dropItems;
         bool    hasDropItems = false;
+        // Property number/slider/toggle/text and tooltip nodes
+        double  propValue = 0.0;            // <v text="X"/>
+        double  propStep  = 1.0;            // <int text="X"/> (slider step)
+        QString textN;                      // n="..." (property name)
+        bool    propBool = false;           // v="true" (property toggle)
+        QString tipLabel = "value";         // l="..." (tooltips)
+        QString tipOn    = "on";            // on="..." (tooltip on/off)
+        QString tipOff   = "off";           // off="..."
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -404,6 +412,19 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
                 info.dropItems.push_back({ it.attribute("l"), val });
             }
         }
+
+        // Property number/slider value, slider step, property text, tooltip text
+        QDomElement vElem = obj.firstChildElement("v");
+        if (!vElem.isNull())
+            info.propValue = vElem.attribute("value", vElem.attribute("text", "0")).toDouble();
+        QDomElement intElem = obj.firstChildElement("int");
+        if (!intElem.isNull())
+            info.propStep = intElem.attribute("value", intElem.attribute("text", "1")).toDouble();
+        if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
+        if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
+        if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
+        if (obj.hasAttribute("on"))  info.tipOn   = obj.attribute("on");
+        if (obj.hasAttribute("off")) info.tipOff  = obj.attribute("off");
 
         // Capacitor charge/discharge times: ct="X" dt="Y" attributes on <object>
         if (obj.hasAttribute("ct"))
@@ -548,6 +569,41 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             ctr->minVal       = info.counterMin;
             ctr->maxVal       = info.counterMax;
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
+        }
+
+        // Property / tooltip nodes
+        // The property name is n="..." on <object>; absent means the default
+        const QString propName = info.textN.isEmpty() ? QString("value") : info.textN;
+        if (info.type == NodeType::PropertyNumber) {
+            auto* pn = static_cast<PropertyNumberNode*>(n.get());
+            pn->propertyName = propName;
+            pn->value        = info.propValue;
+        }
+        if (info.type == NodeType::PropertySlider) {
+            auto* ps = static_cast<PropertySliderNode*>(n.get());
+            ps->propertyName = propName;
+            ps->minValue     = info.counterMin;
+            ps->maxValue     = info.counterMax;
+            ps->step         = info.propStep;
+            ps->value        = info.propValue;
+        }
+        if (info.type == NodeType::PropertyToggle) {
+            auto* pt = static_cast<PropertyToggleNode*>(n.get());
+            pt->propertyName = propName;
+            pt->value        = info.propBool;
+        }
+        if (info.type == NodeType::PropertyText) {
+            if (!info.textN.isEmpty())
+                static_cast<PropertyTextNode*>(n.get())->propertyName = info.textN;
+        }
+        if (info.type == NodeType::TooltipNumber) {
+            static_cast<TooltipNumberNode*>(n.get())->tooltipLabel = info.tipLabel;
+        }
+        if (info.type == NodeType::TooltipOnOff) {
+            auto* tt = static_cast<TooltipOnOffNode*>(n.get());
+            tt->tooltipLabel = info.tipLabel;
+            tt->onText       = info.tipOn;
+            tt->offText      = info.tipOff;
         }
 
         // Threshold — bounds come from <min text="X"/> / <max text="X"/>, which
@@ -722,6 +778,12 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 15: return NodeType::NumberLiteral;
         case 16: return NodeType::ConstantOn;
         case 20: return NodeType::PropertyDropdown;
+        case 19: return NodeType::PropertySlider;
+        case 33: return NodeType::PropertyToggle;
+        case 34: return NodeType::PropertyNumber;
+        case 43: return NodeType::TooltipNumber;
+        case 44: return NodeType::TooltipOnOff;
+        case 58: return NodeType::PropertyText;
 
         // ── Latches / capacitor ───────────────────────────────────────────────
         case 24: return NodeType::SRLatch;
@@ -801,6 +863,12 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::NumberLiteral:       return 15;
         case NodeType::ConstantOn:          return 16;
         case NodeType::PropertyDropdown:    return 20;
+        case NodeType::PropertySlider:      return 19;
+        case NodeType::PropertyToggle:      return 33;
+        case NodeType::PropertyNumber:      return 34;
+        case NodeType::TooltipNumber:       return 43;
+        case NodeType::TooltipOnOff:        return 44;
+        case NodeType::PropertyText:        return 58;
         case NodeType::SRLatch:             return 24;
         case NodeType::JKFlipFlop:          return 25;
         case NodeType::Capacitor:           return 26;
@@ -1019,6 +1087,57 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         maxElem.setAttribute("value", QString::number(th->maxBound));
     };
 
+    // ── Helper: write a Property/Tooltip node's attributes and child elements ──
+    // Returns false for node types it doesn't handle.
+    auto writePropertyData = [&](QDomElement& obj, const Node* n) -> bool {
+        auto setTextValue = [&](const QString& tag, double v, bool withValue) {
+            QDomElement el = obj.firstChildElement(tag);
+            if (el.isNull()) { el = doc.createElement(tag); obj.appendChild(el); }
+            el.setAttribute("text", QString::number(v));
+            if (withValue) el.setAttribute("value", QString::number(v));
+        };
+
+        switch (n->type) {
+            case NodeType::PropertyNumber: {
+                auto* pn = static_cast<const PropertyNumberNode*>(n);
+                obj.setAttribute("n", pn->propertyName);
+                setTextValue("v", pn->value, false);
+                return true;
+            }
+            case NodeType::PropertySlider: {
+                auto* ps = static_cast<const PropertySliderNode*>(n);
+                obj.setAttribute("n", ps->propertyName);
+                setTextValue("min", ps->minValue, false);
+                setTextValue("max", ps->maxValue, true);
+                setTextValue("int", ps->step,     true);
+                setTextValue("v",   ps->value,    false);
+                return true;
+            }
+            case NodeType::PropertyToggle: {
+                auto* pt = static_cast<const PropertyToggleNode*>(n);
+                obj.setAttribute("n", pt->propertyName);
+                if (pt->value) obj.setAttribute("v", "true");
+                else           obj.removeAttribute("v");
+                return true;
+            }
+            case NodeType::PropertyText:
+                obj.setAttribute("n", static_cast<const PropertyTextNode*>(n)->propertyName);
+                return true;
+            case NodeType::TooltipNumber:
+                obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
+                return true;
+            case NodeType::TooltipOnOff: {
+                auto* tt = static_cast<const TooltipOnOffNode*>(n);
+                obj.setAttribute("l",   tt->tooltipLabel);
+                obj.setAttribute("on",  tt->onText);
+                obj.setAttribute("off", tt->offText);
+                return true;
+            }
+            default:
+                return false;
+        }
+    };
+
     // ── Helper: write a Property Dropdown's name, selection and <items> ───────
     auto writeDropdown = [&](QDomElement& obj, const PropertyDropdownNode* dd) {
         obj.setAttribute("name", dd->propertyName);
@@ -1094,6 +1213,8 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                                 obj.setAttribute("e", fn->expression);
                             else
                                 obj.removeAttribute("e");
+                        } else if (writePropertyData(obj, liveNode)) {
+                            // property / tooltip node — attributes written above
                         } else if (liveNode->type == NodeType::Threshold) {
                             writeThresholdBounds(obj, static_cast<ThresholdNode*>(liveNode));
                         } else if (liveNode->type == NodeType::PropertyDropdown) {
@@ -1181,6 +1302,7 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 if (!fn->expression.isEmpty())
                     newObj.setAttribute("e", fn->expression);
             }
+            writePropertyData(newObj, nodePtr.get());
             if (nodePtr->type == NodeType::Threshold)
                 writeThresholdBounds(newObj, static_cast<ThresholdNode*>(nodePtr.get()));
             if (nodePtr->type == NodeType::PropertyDropdown)

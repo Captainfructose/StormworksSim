@@ -16,6 +16,12 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::NumberOutput:        return std::make_unique<NumberOutputNode>();
         case NodeType::NumberLiteral:       return std::make_unique<NumberLiteralNode>();
         case NodeType::PropertyDropdown:    return std::make_unique<PropertyDropdownNode>();
+        case NodeType::PropertyNumber:      return std::make_unique<PropertyNumberNode>();
+        case NodeType::PropertySlider:      return std::make_unique<PropertySliderNode>();
+        case NodeType::PropertyToggle:      return std::make_unique<PropertyToggleNode>();
+        case NodeType::PropertyText:        return std::make_unique<PropertyTextNode>();
+        case NodeType::TooltipNumber:       return std::make_unique<TooltipNumberNode>();
+        case NodeType::TooltipOnOff:        return std::make_unique<TooltipOnOffNode>();
 
         // ── Composite ─────────────────────────────────────────────────────────
         case NodeType::CompositeInput:       return std::make_unique<CompositeInputNode>();

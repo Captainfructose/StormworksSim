@@ -398,7 +398,14 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(statefulMenu, "PID Advanced",        NodeType::PIDControllerAdvanced);
 
     QMenu* propertyMenu = addMenu->addMenu("Property");
-    addEntry(propertyMenu, "Dropdown", NodeType::PropertyDropdown);
+    addEntry(propertyMenu, "Dropdown",        NodeType::PropertyDropdown);
+    addEntry(propertyMenu, "Number",          NodeType::PropertyNumber);
+    addEntry(propertyMenu, "Slider",          NodeType::PropertySlider);
+    addEntry(propertyMenu, "Toggle",          NodeType::PropertyToggle);
+    addEntry(propertyMenu, "Text",            NodeType::PropertyText);
+    propertyMenu->addSeparator();
+    addEntry(propertyMenu, "Tooltip Number",  NodeType::TooltipNumber);
+    addEntry(propertyMenu, "Tooltip On/Off",  NodeType::TooltipOnOff);
 
     QMenu* funcMenu = addMenu->addMenu("Function");
     addEntry(funcMenu, "Function (1 input)",      NodeType::Function1);
