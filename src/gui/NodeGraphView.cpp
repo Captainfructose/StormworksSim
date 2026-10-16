@@ -354,6 +354,7 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(compositeMenu, "Composite Write Number", NodeType::CompositeWriteNumber);
     addEntry(compositeMenu, "Composite Write Bool",   NodeType::CompositeWriteBool);
     addEntry(compositeMenu, "Composite Switchbox",    NodeType::CompositeSwitchbox);
+    addEntry(compositeMenu, "Lua Script",             NodeType::LuaScript);
     addEntry(compositeMenu, "Binary to Number",       NodeType::BinaryToNumber);
     addEntry(compositeMenu, "Number to Binary",       NodeType::NumberToBinary);
 

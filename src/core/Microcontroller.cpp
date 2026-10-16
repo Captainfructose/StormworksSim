@@ -229,6 +229,63 @@ void Microcontroller::buildEvalOrder()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// preserveAttributeWhitespace
+//
+// Replaces raw \n, \r and \t characters found inside quoted attribute values
+// with character references (&#10; &#13; &#9;), which XML parsers keep as-is.
+// Text outside tags and comments is left untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+static QString preserveAttributeWhitespace(const QString& xml)
+{
+    QString out;
+    out.reserve(xml.size());
+
+    bool inTag   = false; // between '<' and '>'
+    QChar quote;          // the open quote character, or null if not in a value
+
+    for (int i = 0; i < xml.size(); ++i) {
+        const QChar c = xml[i];
+
+        if (!inTag) {
+            if (c == '<') {
+                // Copy comments and CDATA verbatim so quotes in them are ignored
+                if (xml.mid(i, 4) == "<!--") {
+                    int end = xml.indexOf("-->", i + 4);
+                    end = (end < 0) ? xml.size() : end + 3;
+                    out.append(xml.mid(i, end - i));
+                    i = end - 1;
+                    continue;
+                }
+                if (xml.mid(i, 9) == "<![CDATA[") {
+                    int end = xml.indexOf("]]>", i + 9);
+                    end = (end < 0) ? xml.size() : end + 3;
+                    out.append(xml.mid(i, end - i));
+                    i = end - 1;
+                    continue;
+                }
+                inTag = true;
+            }
+            out.append(c);
+            continue;
+        }
+
+        // Inside a tag
+        if (!quote.isNull()) {
+            if (c == quote)       { quote = QChar(); out.append(c); }
+            else if (c == '\n')   out.append("&#10;");
+            else if (c == '\r')   out.append("&#13;");
+            else if (c == '\t')   out.append("&#9;");
+            else                  out.append(c);
+        } else {
+            if (c == '"' || c == '\'') quote = c;
+            else if (c == '>')         inTag = false;
+            out.append(c);
+        }
+    }
+    return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // loadFromFile
 // ─────────────────────────────────────────────────────────────────────────────
 bool Microcontroller::loadFromFile(const QString& path, QString& errorMsg)
@@ -239,10 +296,16 @@ bool Microcontroller::loadFromFile(const QString& path, QString& errorMsg)
         return false;
     }
 
+    // XML parsers normalise raw newlines/tabs inside attribute values to plain
+    // spaces, but Stormworks writes Lua scripts as raw multi-line attributes.
+    // Turning them into character references first keeps the script intact
+    // (a flattened script would have its -- comments swallow the code).
+    const QString xmlText = preserveAttributeWhitespace(QString::fromUtf8(file.readAll()));
+
     QDomDocument doc;
     QString parseError;
     int line = 0, col = 0;
-    if (!doc.setContent(&file, &parseError, &line, &col)) {
+    if (!doc.setContent(xmlText, &parseError, &line, &col)) {
         errorMsg = QString("XML parse error at line %1, col %2: %3")
                    .arg(line).arg(col).arg(parseError);
         return false;
@@ -311,6 +374,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         QString tipOff   = "off";           // off="..."
         double  blinkOn  = 0.5;             // on="seconds"  (blinker)
         double  blinkOff = 0.5;             // off="seconds"
+        QString script;                     // script="..." (Lua node)
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -422,6 +486,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         QDomElement intElem = obj.firstChildElement("int");
         if (!intElem.isNull())
             info.propStep = intElem.attribute("value", intElem.attribute("text", "1")).toDouble();
+        if (obj.hasAttribute("script")) info.script = obj.attribute("script");
         if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
         if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
         if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
@@ -578,6 +643,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             ctr->maxVal       = info.counterMax;
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
         }
+
+        // Lua script text
+        if (info.type == NodeType::LuaScript)
+            static_cast<LuaScriptNode*>(n.get())->script = info.script;
 
         // Blinker — on/off durations from the on="" and off="" attributes
         if (info.type == NodeType::Blinker) {
@@ -810,6 +879,7 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 48: return NodeType::ToggleToPush;
         case 27: return NodeType::Blinker;
         case 54: return NodeType::NumberToBinary;
+        case 56: return NodeType::LuaScript;
         case 55: return NodeType::BinaryToNumber;
 
         // ── Composite ─────────────────────────────────────────────────────────
@@ -892,6 +962,7 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Capacitor:           return 26;
         case NodeType::Blinker:             return 27;
         case NodeType::NumberToBinary:      return 54;
+        case NodeType::LuaScript:           return 56;
         case NodeType::BinaryToNumber:      return 55;
         case NodeType::PushToToggle:        return 28;
         case NodeType::ToggleToPush:        return 48;
@@ -1147,6 +1218,23 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             case NodeType::TooltipNumber:
                 obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
                 return true;
+            case NodeType::LuaScript: {
+                // Script text lives in script="..." on <object>, and a copy sits
+                // on the matching entry in <component_states>; keep both in sync
+                const QString& script = static_cast<const LuaScriptNode*>(n)->script;
+                const int compId = obj.attribute("id", "-1").toInt();
+                auto apply = [&](QDomElement& el) {
+                    if (script.isEmpty()) el.removeAttribute("script");
+                    else                  el.setAttribute("script", script);
+                };
+                apply(obj);
+                QDomElement states = group.firstChildElement("component_states");
+                for (QDomElement s = states.firstChildElement(); !s.isNull();
+                     s = s.nextSiblingElement()) {
+                    if (s.attribute("id", "-1").toInt() == compId) apply(s);
+                }
+                return true;
+            }
             case NodeType::Blinker: {
                 auto* bl = static_cast<const BlinkerNode*>(n);
                 obj.setAttribute("on",  QString::number(bl->onTime));

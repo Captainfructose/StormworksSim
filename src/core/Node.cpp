@@ -32,6 +32,7 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::CompositeWriteNumber: return std::make_unique<CompositeWriteNumberNode>();
         case NodeType::CompositeWriteBool:   return std::make_unique<CompositeWriteBoolNode>();
         case NodeType::CompositeSwitchbox:   return std::make_unique<CompositeSwitchboxNode>();
+        case NodeType::LuaScript:            return std::make_unique<LuaScriptNode>();
         case NodeType::BinaryToNumber:       return std::make_unique<BinaryToNumberNode>();
         case NodeType::NumberToBinary:       return std::make_unique<NumberToBinaryNode>();
 

@@ -623,12 +623,12 @@ void IOPanel::onCompositeBoolChanged(int nodeId, int channelIdx, bool value)
 {
     if (!mc_) return;
     Node* n = mc_->node(nodeId);
-    if (!n) return;
+    if (!n || n->type != NodeType::CompositeInput) return;
 
-    while ((int)n->inputs.size() <= channelIdx)
-        n->inputs.push_back(Port::makeBool(QString("Ch%1").arg(n->inputs.size() + 1)));
-
-    n->inputs[channelIdx].set(value);
+    // The node rebuilds its composite from these channel values every tick
+    auto* ci = static_cast<CompositeInputNode*>(n);
+    if (channelIdx >= 0 && channelIdx < (int)ci->channels.size())
+        ci->channels[channelIdx].boolValue = value;
     emit inputChanged();
 }
 
@@ -639,11 +639,10 @@ void IOPanel::onCompositeNumberChanged(int nodeId, int channelIdx, double value)
 {
     if (!mc_) return;
     Node* n = mc_->node(nodeId);
-    if (!n) return;
+    if (!n || n->type != NodeType::CompositeInput) return;
 
-    while ((int)n->inputs.size() <= channelIdx)
-        n->inputs.push_back(Port::makeNumber(QString("Ch%1").arg(n->inputs.size() + 1)));
-
-    n->inputs[channelIdx].set(value);
+    auto* ci = static_cast<CompositeInputNode*>(n);
+    if (channelIdx >= 0 && channelIdx < (int)ci->channels.size())
+        ci->channels[channelIdx].numberValue = value;
     emit inputChanged();
 }

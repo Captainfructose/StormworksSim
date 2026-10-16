@@ -1,50 +1,49 @@
 #pragma once
 
 #include "../Node.h"
+#include <cstdint>
 #include <vector>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Composite Nodes
+//
+// A composite wire carries a CompositeData: 32 number channels and 32 bool
+// channels (see Node.h). Nodes below read, write and route those channels.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── COMPOSITE CHANNEL INFO ────────────────────────────────────────────────────
-// Describes one channel inside a CompositeInput node.
+// Describes one channel set up on a CompositeInput node, plus the value the
+// I/O panel currently has for it.
 struct CompositeChannel {
-    int      index    = 1;              // which composite slot (1-32)
+    int      index    = 1;                // which composite slot (1-32)
     PortType dataType = PortType::Number; // bool or number
+    double   numberValue = 0.0;           // current value if dataType is Number
+    bool     boolValue   = false;         // current value if dataType is Bool
 };
 
 // ── COMPOSITE INPUT (type 4 in components_bridge) ─────────────────────────────
-// Represents a composite wire coming into the MC from the vehicle.
-// Has one purple output port. The settings dialog configures how many
-// channels it contains and what type/index each channel is.
-// Downstream Composite Read nodes extract individual channels.
+// A composite wire coming into the MC from the vehicle. One purple output port.
+// The I/O panel configures which channels it drives and their values; each tick
+// the node builds a CompositeData from them.
 class CompositeInputNode : public Node {
 public:
-    std::vector<CompositeChannel> channels; // per-channel config
+    std::vector<CompositeChannel> channels;
 
     CompositeInputNode() : Node(NodeType::CompositeInput, "Composite Input") {
         // Default: one number channel at index 1
         channels = { { 1, PortType::Number } };
-        outputs  = { Port::makeNumber("Composite") };
+        outputs  = { Port::makeComposite("Composite") };
     }
 
-    // Called by settings dialog to reconfigure channels.
-    // We keep a single output port — the composite wire.
-    void setChannels(const std::vector<CompositeChannel>& ch) {
-        channels = ch;
-        // Keep a single composite output port regardless of channel count
-        outputs = { Port::makeNumber("Composite") };
-    }
+    void setChannels(const std::vector<CompositeChannel>& ch) { channels = ch; }
 
     void evaluate() override {
-        // The composite input acts as a multi-channel source.
-        // Individual channel values are stored in inputs[] by the IOPanel.
-        // Downstream Composite Read nodes connect to this node and pull
-        // from the appropriate input slot via their portIdx connection.
-        // We pass input[0] through to output[0] as the "composite wire".
-        if (!inputs.empty())
-            outputs[0].value = inputs[0].value;
+        CompositeData data;
+        for (const auto& ch : channels) {
+            if (ch.dataType == PortType::Bool) data.setBool  (ch.index, ch.boolValue);
+            else                               data.setNumber(ch.index, ch.numberValue);
+        }
+        outputComposite(0, data);
     }
 };
 
@@ -55,13 +54,15 @@ public:
 class CompositeOutputNode : public Node {
 public:
     CompositeOutputNode() : Node(NodeType::CompositeOutput, "Composite Output") {
-        inputs  = { Port::makeNumber("Composite") };
-        outputs = { Port::makeNumber("Value") }; // hidden; mirrors the other sink nodes
+        inputs  = { Port::makeComposite("Composite") };
+        outputs = { Port::makeComposite("Value") }; // hidden; mirrors the other sink nodes
     }
-    void evaluate() override { outputs[0].value = inputs[0].value; }
+    void evaluate() override { outputComposite(0, inputComposite(0)); }
 };
 
 // ── COMPOSITE PACKER ─────────────────────────────────────────────────────────
+// Simulator-only helper (not a Stormworks node): number channels Ch1..ChN in,
+// one composite out with those numbers on channels 1..N.
 class CompositePackerNode : public Node {
 public:
     int channelCount = 1;
@@ -73,101 +74,133 @@ public:
     void setChannelCount(int count) {
         channelCount = count;
         inputs.clear();
-        outputs.clear();
-        for (int i = 0; i < count; ++i) {
+        for (int i = 0; i < count; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(i + 1)));
-            outputs.push_back(Port::makeNumber(QString("Ch%1").arg(i + 1)));
-        }
+        outputs = { Port::makeComposite("Composite") };
         name = QString("Comp. Packer (%1ch)").arg(count);
     }
 
     void evaluate() override {
-        for (int i = 0; i < (int)inputs.size() && i < (int)outputs.size(); ++i)
-            outputs[i].value = inputs[i].value;
+        CompositeData data;
+        for (int i = 0; i < (int)inputs.size(); ++i)
+            data.setNumber(i + 1, inputs[i].asNumber());
+        outputComposite(0, data);
     }
 };
 
 // ── COMPOSITE READ (NUMBER) ───────────────────────────────────────────────────
+// Reads number channel `channelIndex` of the incoming composite.
 class CompositeReadNumberNode : public Node {
 public:
     int channelIndex = 1;
 
     CompositeReadNumberNode() : Node(NodeType::CompositeReadNumber, "Comp. Read (Num)") {
-        inputs  = { Port::makeNumber("In") };
+        inputs  = { Port::makeComposite("In") };
         outputs = { Port::makeNumber("Out") };
     }
 
     void evaluate() override {
-        outputNumber(0, inputNumber(0));
+        outputNumber(0, inputComposite(0).number(channelIndex));
     }
 };
 
 // ── COMPOSITE READ (BOOL) ─────────────────────────────────────────────────────
+// Reads bool channel `channelIndex` of the incoming composite.
 class CompositeReadBoolNode : public Node {
 public:
     int channelIndex = 1;
 
     CompositeReadBoolNode() : Node(NodeType::CompositeReadBool, "Comp. Read (Bool)") {
-        inputs  = { Port::makeBool("In") };
+        inputs  = { Port::makeComposite("In") };
         outputs = { Port::makeBool("Out") };
     }
 
     void evaluate() override {
-        outputBool(0, inputBool(0));
+        outputBool(0, inputComposite(0).boolean(channelIndex));
     }
 };
 
 // ── COMPOSITE SWITCHBOX ───────────────────────────────────────────────────────
 // in[0]=Composite On, in[1]=Composite Off, in[2]=Switch(bool) → out[0]=Composite.
 // Passes through the On composite while Switch is on, otherwise the Off one.
-// Type 53 in Stormworks XML. Composite wires are modelled as a single carrier
-// value in this simulator (see CompositeWriteNumberNode below).
+// Type 53 in Stormworks XML.
 class CompositeSwitchboxNode : public Node {
 public:
     CompositeSwitchboxNode() : Node(NodeType::CompositeSwitchbox, "Comp. Switchbox") {
-        inputs  = { Port::makeNumber("Comp. On"), Port::makeNumber("Comp. Off"),
+        inputs  = { Port::makeComposite("Comp. On"), Port::makeComposite("Comp. Off"),
                     Port::makeBool("Switch") };
-        outputs = { Port::makeNumber("Composite") };
+        outputs = { Port::makeComposite("Composite") };
     }
     void evaluate() override {
-        outputs[0].value = inputBool(2) ? inputs[0].value : inputs[1].value;
+        outputComposite(0, inputBool(2) ? inputComposite(0) : inputComposite(1));
     }
 };
 
 // ── BINARY TO NUMBER ──────────────────────────────────────────────────────────
 // in[0]=Composite → out[0]=Number. Type 55 in Stormworks XML.
-// The simulator models a composite as a single carrier value, so the binary
-// channels and the number are the same value here: this passes it through.
+// Reads the 32 bool channels as the bits of a signed 32-bit integer, channel 1
+// being the least significant bit.
 class BinaryToNumberNode : public Node {
 public:
     BinaryToNumberNode() : Node(NodeType::BinaryToNumber, "Binary to Number") {
-        inputs  = { Port::makeNumber("Composite") };
+        inputs  = { Port::makeComposite("Composite") };
         outputs = { Port::makeNumber("Number") };
     }
-    void evaluate() override { outputNumber(0, inputNumber(0)); }
+    void evaluate() override {
+        const CompositeData data = inputComposite(0);
+        std::uint32_t bits = 0;
+        for (int ch = 1; ch <= CompositeData::kChannels; ++ch)
+            if (data.boolean(ch)) bits |= (std::uint32_t(1) << (ch - 1));
+        outputNumber(0, double(static_cast<std::int32_t>(bits)));
+    }
 };
 
 // ── NUMBER TO BINARY ──────────────────────────────────────────────────────────
-// in[0]=Number → out[0]=Composite. Type 54 in Stormworks XML. Pass-through for
-// the same reason as BinaryToNumberNode.
+// in[0]=Number → out[0]=Composite. Type 54 in Stormworks XML.
+// Writes the number (as a signed 32-bit integer) onto the 32 bool channels,
+// channel 1 being the least significant bit.
 class NumberToBinaryNode : public Node {
 public:
     NumberToBinaryNode() : Node(NodeType::NumberToBinary, "Number to Binary") {
         inputs  = { Port::makeNumber("Number") };
-        outputs = { Port::makeNumber("Composite") };
+        outputs = { Port::makeComposite("Composite") };
     }
-    void evaluate() override { outputNumber(0, inputNumber(0)); }
+    void evaluate() override {
+        const double v = inputNumber(0);
+        // Clamp before converting so out-of-range doubles don't overflow
+        const double clamped = v < -2147483648.0 ? -2147483648.0
+                             : v >  2147483647.0 ?  2147483647.0 : v;
+        const std::uint32_t bits = static_cast<std::uint32_t>(static_cast<std::int32_t>(clamped));
+        CompositeData data;
+        for (int ch = 1; ch <= CompositeData::kChannels; ++ch)
+            data.setBool(ch, (bits >> (ch - 1)) & 1u);
+        outputComposite(0, data);
+    }
+};
+
+// ── LUA SCRIPT ────────────────────────────────────────────────────────────────
+// Type 56 in Stormworks XML: composite in, composite out, and the script text in
+// script="..." on <object>. The simulator keeps and saves the script but does
+// not run it, so the output composite stays empty.
+class LuaScriptNode : public Node {
+public:
+    QString script;
+
+    LuaScriptNode() : Node(NodeType::LuaScript, "Lua Script") {
+        inputs  = { Port::makeComposite("Composite") };
+        outputs = { Port::makeComposite("Composite") };
+    }
+    void evaluate() override { outputComposite(0, CompositeData{}); }
 };
 
 // ── COMPOSITE WRITE (NUMBER) ──────────────────────────────────────────────────
 // Port layout:
 //   input[0]  = Composite In  (the existing composite wire to merge onto)
 //   input[1+] = Channel 1, Channel 2, ... (number-typed, configurable count)
-//   output[0] = Composite Out (same composite, passed through — the new
-//               channel values conceptually overwrite slots startIndex..
-//               startIndex+channelCount-1 in that composite)
+//   output[0] = Composite Out: the incoming composite with number channels
+//               startIndex .. startIndex+channelCount-1 overwritten by the
+//               channel inputs.
 //
-// channelCount and startIndex are configurable via the settings dialog.
 // Bool and Number channels live in separate namespaces within a composite,
 // so a Write Number at startIndex=1 doesn't collide with a Write Bool also
 // at startIndex=1 on the same wire.
@@ -191,23 +224,19 @@ public:
     }
 
     void evaluate() override {
-        // Pass the composite-in value straight through on the composite-out
-        // port. The individual channel input values are conceptually merged
-        // into the composite at startIndex..startIndex+channelCount-1; our
-        // simplified composite model (a single carrier value) doesn't need
-        // to do anything further here since downstream Composite Read nodes
-        // read channel values via their own direct connections, same as
-        // every other composite node in this simulator.
-        outputs[0].value = inputs[0].value;
+        CompositeData data = inputComposite(0);
+        for (int i = 0; i < channelCount; ++i)
+            data.setNumber(startIndex + i, inputNumber(1 + i));
+        outputComposite(0, data);
     }
 
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeNumber("Composite In"));
+        inputs.push_back(Port::makeComposite("Composite In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeNumber("Composite Out") };
+        outputs = { Port::makeComposite("Composite Out") };
         name = QString("Comp. Write Num (%1ch @%2)").arg(channelCount).arg(startIndex);
     }
 };
@@ -235,16 +264,19 @@ public:
     }
 
     void evaluate() override {
-        outputs[0].value = inputs[0].value;
+        CompositeData data = inputComposite(0);
+        for (int i = 0; i < channelCount; ++i)
+            data.setBool(startIndex + i, inputBool(1 + i));
+        outputComposite(0, data);
     }
 
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeNumber("Composite In"));
+        inputs.push_back(Port::makeComposite("Composite In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeBool(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeNumber("Composite Out") };
+        outputs = { Port::makeComposite("Composite Out") };
         name = QString("Comp. Write Bool (%1ch @%2)").arg(channelCount).arg(startIndex);
     }
 };

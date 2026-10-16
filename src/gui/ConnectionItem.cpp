@@ -53,19 +53,12 @@ void ConnectionItem::paint(QPainter* painter,
     // Determined by the source node type and output port type
     QColor wireColor = QColor(0x00, 0xe0, 0x50); // default green (number)
     Node* srcNode = source_->node();
-    if (srcNode) {
-        // Composite wires are always purple regardless of channel type
-        if (srcNode->type == NodeType::CompositeInput ||
-            srcNode->type == NodeType::CompositePacker ||
-            srcNode->type == NodeType::CompositeWriteNumber ||
-            srcNode->type == NodeType::CompositeWriteBool ||
-            srcNode->type == NodeType::CompositeSwitchbox ||
-            srcNode->type == NodeType::NumberToBinary) {
-            wireColor = QColor(0x80, 0x00, 0xff); // purple — composite
-        } else if (sourcePort_ < (int)srcNode->outputs.size()) {
-            if (srcNode->outputs[sourcePort_].type == PortType::Bool)
-                wireColor = QColor(0xf0, 0x10, 0x50); // red — bool
-        }
+    if (srcNode && sourcePort_ < (int)srcNode->outputs.size()
+        && srcNode->outputs[sourcePort_].type == PortType::Composite) {
+        wireColor = QColor(0x80, 0x00, 0xff); // purple — composite
+    } else if (srcNode && sourcePort_ < (int)srcNode->outputs.size()
+               && srcNode->outputs[sourcePort_].type == PortType::Bool) {
+        wireColor = QColor(0xf0, 0x10, 0x50); // red — bool
     }
 
     // Stormworks-style wire: a straight line with small direction arrows

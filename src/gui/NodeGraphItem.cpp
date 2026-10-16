@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QRadioButton>
+#include <QPlainTextEdit>
 #include <QButtonGroup>
 #include <algorithm>
 #include <QComboBox>
@@ -140,6 +141,7 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::CompositeInput:
         case NodeType::CompositeOutput:
         case NodeType::Capacitor:
+        case NodeType::LuaScript:
         case NodeType::Blinker:
         case NodeType::Threshold:
         case NodeType::PropertyDropdown:
@@ -342,28 +344,12 @@ void NodeGraphItem::paint(QPainter* painter,
                          node_->type == NodeType::CompositeOutput);
 
     // Helper: get port color based on type, port index, and direction.
-    auto portColor = [this](const Port& p, bool isOutput, int portIdx) -> QColor {
-        bool isWriteNode = (node_->type == NodeType::CompositeWriteNumber ||
-                            node_->type == NodeType::CompositeWriteBool);
-
-        bool isCompositeSide =
-            (node_->type == NodeType::CompositeInput ||
-             node_->type == NodeType::CompositeOutput ||
-             node_->type == NodeType::CompositePacker) ||
-            ((node_->type == NodeType::CompositeReadNumber ||
-              node_->type == NodeType::CompositeReadBool) && !isOutput) ||
-            (isWriteNode && isOutput) ||
-            (isWriteNode && !isOutput && portIdx == 0) ||
-            (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIdx < 2)) ||
-            (node_->type == NodeType::BinaryToNumber && !isOutput) ||
-            (node_->type == NodeType::NumberToBinary && isOutput);
-
-        if (isCompositeSide)
-            return QColor(0x80, 0x00, 0xff);
-
-        return (p.type == PortType::Bool)
-               ? QColor(0xf0, 0x10, 0x50)
-               : QColor(0x00, 0xe0, 0x50);
+    auto portColor = [](const Port& p, bool /*isOutput*/, int /*portIdx*/) -> QColor {
+        switch (p.type) {
+            case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple
+            case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red
+            default:                  return QColor(0x00, 0xe0, 0x50); // green
+        }
     };
 
     // ── Inner display rectangle ───────────────────────────────────────────────
@@ -402,6 +388,7 @@ void NodeGraphItem::paint(QPainter* painter,
     // For logic gates these connect via lines to the gate body
     for (int i = 0; i < (int)node_->inputs.size(); ++i) {
         const Port& p  = node_->inputs[i];
+        if (p.type == PortType::Composite) continue; // no single value to show
         // These are display-only state indicators — the real input ports are the
         // rings on the node's left edge. Source/sink nodes show one centred
         // indicator (circle or value).
@@ -504,6 +491,7 @@ void NodeGraphItem::paint(QPainter* painter,
     // Source/sink nodes already show their value above, so skip the duplicate.
     for (int i = 0; i < (int)node_->outputs.size() && !isSourceNode && !isSinkNode; ++i) {
         const Port& p  = node_->outputs[i];
+        if (p.type == PortType::Composite) continue; // no single value to show
         // For logic gates, always center the single output circle vertically
         qreal cy = isLogicGate ? innerRect.center().y()
                                : innerRect.top() + i * rowH + rowH * 0.5;
@@ -807,27 +795,11 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
 
     const Port& p = ports[portIndex];
 
-    bool isWriteNode = (node_->type == NodeType::CompositeWriteNumber ||
-                        node_->type == NodeType::CompositeWriteBool);
-
-    bool isCompositeSide =
-        (node_->type == NodeType::CompositeInput ||
-         node_->type == NodeType::CompositeOutput ||
-         node_->type == NodeType::CompositePacker) ||
-        ((node_->type == NodeType::CompositeReadNumber ||
-          node_->type == NodeType::CompositeReadBool) && !isOutput) ||
-        (isWriteNode && isOutput) ||
-        (isWriteNode && !isOutput && portIndex == 0) ||
-        (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIndex < 2)) ||
-        (node_->type == NodeType::BinaryToNumber && !isOutput) ||
-        (node_->type == NodeType::NumberToBinary && isOutput);
-
-    if (isCompositeSide)
-        return QColor(0x80, 0x00, 0xff); // purple — composite wire
-
-    return (p.type == PortType::Bool)
-           ? QColor(0xf0, 0x10, 0x50)   // red — bool
-           : QColor(0x00, 0xe0, 0x50);  // green — number
+    switch (p.type) {
+        case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple — composite wire
+        case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red — bool
+        default:                  return QColor(0x00, 0xe0, 0x50); // green — number
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1419,6 +1391,36 @@ void NodeGraphItem::openSettingsDialog()
 
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
             node_->label = labelEdit->text().trimmed();
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Lua Script ─────────────────────────────────────────────────────────────
+    // The script is stored and saved but not executed by the simulator.
+    else if (node_->type == NodeType::LuaScript) {
+        auto* lua = static_cast<LuaScriptNode*>(node_);
+        dialog.setMinimumWidth(640);
+
+        auto* note = new QLabel("The simulator keeps and saves this script but does not run it.");
+        note->setStyleSheet("color: #acacac;");
+        layout->addWidget(note);
+
+        auto* editor = new QPlainTextEdit;
+        editor->setPlainText(lua->script);
+        editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+        editor->setMinimumHeight(320);
+        QFont mono("Consolas");
+        mono.setStyleHint(QFont::Monospace);
+        editor->setFont(mono);
+        editor->setTabStopDistance(4 * QFontMetricsF(mono).horizontalAdvance(' '));
+        layout->addWidget(editor);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            lua->script = editor->toPlainText();
             update();
             dialog.accept();
         });
