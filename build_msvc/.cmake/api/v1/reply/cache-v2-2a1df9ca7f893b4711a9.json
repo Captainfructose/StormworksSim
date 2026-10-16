@@ -6630,6 +6630,18 @@
 			"value" : "Vulkan_LIBRARY-NOTFOUND"
 		},
 		{
+			"name" : "WINDEPLOYQT",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Path to a program."
+				}
+			],
+			"type" : "FILEPATH",
+			"value" : "C:/Qt/6.11.1/msvc2022_64/bin/windeployqt.exe"
+		},
+		{
 			"name" : "WINDEPLOYQT_EXECUTABLE",
 			"properties" : 
 			[

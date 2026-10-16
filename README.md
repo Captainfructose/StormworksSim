@@ -215,14 +215,12 @@ cmake .. -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
 cmake --build . --config Debug
 ```
 
-After building, deploy Qt DLLs:
-```bat
-C:\Qt\6.11.1\msvc2022_64\bin\windeployqt.exe Debug\StormworksSim.exe
-```
+The build puts `StormworksSim.exe` in the **project root** (not in `build_msvc`) and automatically runs `windeployqt` afterwards, so the Qt DLLs and plugin folders (`platforms/`, `styles/`, …) are deployed beside it. These files are listed in `.gitignore`.
 
 Then run:
 ```bat
-Debug\StormworksSim.exe
+cd ..
+StormworksSim.exe
 ```
 
 If a rebuild fails with `LNK1168: cannot open ... StormworksSim.exe for writing`, close the running app first.
@@ -267,6 +265,7 @@ StormworksSim/
 │       ├── NodeGraphItem.h / .cpp     # Per-node visual: drawing, gate symbols, settings dialogs
 │       ├── ConnectionItem.h / .cpp    # Wire visual (straight line with arrows, color by type)
 │       └── IOPanel.h / .cpp           # Right-side I/O controls panel
+├── .gitignore                         # Ignores the exe and deployed Qt runtime in the root
 ├── resources.qrc                      # Qt resource file (icons)
 ├── src/gui/icons/
 │   ├── up_arrow.png                   # Spinbox up arrow icon

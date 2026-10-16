@@ -2,10 +2,10 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "MinSizeRel/StormworksSim.exe"
+			"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/StormworksSim.exe"
 		},
 		{
-			"path" : "MinSizeRel/StormworksSim.pdb"
+			"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/StormworksSim.pdb"
 		}
 	],
 	"backtrace" : 1,
@@ -21,6 +21,7 @@
 			"__find_dependency_common",
 			"find_dependency",
 			"_qt_internal_find_qt_dependencies",
+			"add_custom_command",
 			"target_include_directories"
 		],
 		"files" : 
@@ -173,6 +174,12 @@
 			{
 				"command" : 8,
 				"file" : 0,
+				"line" : 91,
+				"parent" : 0
+			},
+			{
+				"command" : 9,
+				"file" : 0,
 				"line" : 63,
 				"parent" : 0
 			}
@@ -204,7 +211,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -std:c++17 -MD"
+					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd"
 				},
 				{
 					"backtrace" : 2,
@@ -228,10 +235,6 @@
 				{
 					"backtrace" : 2,
 					"define" : "QT_GUI_LIB"
-				},
-				{
-					"backtrace" : 2,
-					"define" : "QT_NO_DEBUG"
 				},
 				{
 					"backtrace" : 2,
@@ -270,10 +273,10 @@
 			[
 				{
 					"backtrace" : 0,
-					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_MinSizeRel"
+					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_Debug"
 				},
 				{
-					"backtrace" : 25,
+					"backtrace" : 26,
 					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src"
 				},
 				{
@@ -349,11 +352,11 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -MD",
+				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -MDd",
 				"role" : "flags"
 			},
 			{
-				"fragment" : "/machine:x64 /INCREMENTAL:NO",
+				"fragment" : "/machine:x64 /debug /INCREMENTAL",
 				"role" : "flags"
 			},
 			{
@@ -362,17 +365,17 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Widgets.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Widgetsd.lib",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Xml.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Xmld.lib",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 9,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Gui.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Guid.lib",
 				"role" : "libraries"
 			},
 			{
@@ -397,7 +400,7 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Core.lib",
+				"fragment" : "C:\\Qt\\6.11.1\\msvc2022_64\\lib\\Qt6Cored.lib",
 				"role" : "libraries"
 			},
 			{
@@ -438,14 +441,18 @@
 	[
 		{
 			"backtrace" : 0,
-			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 0,
 			"id" : "Qt6::moc::@6890427a1f51a3e7e1df"
 		},
 		{
 			"id" : "Qt6::rcc::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 0,
+			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 25,
+			"id" : "StormworksSim::@6890427a1f51a3e7e1df"
 		}
 	],
 	"paths" : 
@@ -518,7 +525,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_MinSizeRel.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_Debug.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -683,7 +690,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_MinSizeRel.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_Debug.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
