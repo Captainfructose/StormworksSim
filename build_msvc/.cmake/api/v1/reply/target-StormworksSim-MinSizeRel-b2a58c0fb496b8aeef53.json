@@ -2,10 +2,10 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "Release/StormworksSim.exe"
+			"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/StormworksSim.exe"
 		},
 		{
-			"path" : "Release/StormworksSim.pdb"
+			"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/StormworksSim.pdb"
 		}
 	],
 	"backtrace" : 1,
@@ -21,6 +21,7 @@
 			"__find_dependency_common",
 			"find_dependency",
 			"_qt_internal_find_qt_dependencies",
+			"add_custom_command",
 			"target_include_directories"
 		],
 		"files" : 
@@ -173,6 +174,12 @@
 			{
 				"command" : 8,
 				"file" : 0,
+				"line" : 91,
+				"parent" : 0
+			},
+			{
+				"command" : 9,
+				"file" : 0,
 				"line" : 63,
 				"parent" : 0
 			}
@@ -204,7 +211,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD"
+					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -std:c++17 -MD"
 				},
 				{
 					"backtrace" : 2,
@@ -270,10 +277,10 @@
 			[
 				{
 					"backtrace" : 0,
-					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_Release"
+					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/build_msvc/StormworksSim_autogen/include_MinSizeRel"
 				},
 				{
-					"backtrace" : 25,
+					"backtrace" : 26,
 					"path" : "C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src"
 				},
 				{
@@ -349,7 +356,7 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -MD",
+				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 /DNDEBUG -MD",
 				"role" : "flags"
 			},
 			{
@@ -438,14 +445,18 @@
 	[
 		{
 			"backtrace" : 0,
-			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 0,
 			"id" : "Qt6::moc::@6890427a1f51a3e7e1df"
 		},
 		{
 			"id" : "Qt6::rcc::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 0,
+			"id" : "Qt6::uic::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 25,
+			"id" : "StormworksSim::@6890427a1f51a3e7e1df"
 		}
 	],
 	"paths" : 
@@ -518,7 +529,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_Release.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/mocs_compilation_MinSizeRel.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -683,7 +694,7 @@
 			"backtrace" : 0,
 			"compileGroupIndex" : 0,
 			"isGenerated" : true,
-			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_Release.cpp",
+			"path" : "build_msvc/StormworksSim_autogen/EWIEGA46WW/qrc_resources_MinSizeRel.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
