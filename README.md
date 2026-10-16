@@ -22,13 +22,15 @@ The editor is styled after the in-game microcontroller editor: a teal board with
   - **red** = bool
   - **green** = number
   - **purple** = composite
+  - **aqua** = video
+  - **olive** = audio
 - Wires are straight lines with small direction arrows, drawn on top of nodes
 - Input ports are **rings** on the left edge of a node; output ports are **filled discs** on the right edge
 - **Delete/Backspace** key removes the selected node along with all its connections
 - Right-click a node to delete it directly from the context menu
 - Nodes with settings have a **⚙** button in the header
 - Hover a port to see its **full label and type** in a tooltip (labels on the node itself are kept short)
-- Video and audio wires are **aqua** and **olive**. The simulator has no pictures or sound, so a video or audio signal is just the name of the source it comes from — a Video/Audio Output's panel shows which input is being routed to it.
+- The simulator has no pictures or sound, so a video or audio signal is just the name of the source it comes from — a Video/Audio Output's panel shows which input is being routed to it.
 
 ### Node Appearance
 - Nodes are **4 grid squares wide**, like in the game. Each is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a **bold** title at the top left. There is no header strip.
@@ -250,7 +252,7 @@ StormworksSim/
 │   │   ├── Node.h / Node.cpp          # Base node class, Port/CompositeData, NodeType enum, factory
 │   │   ├── Connection.h               # Wire endpoint struct
 │   │   ├── Microcontroller.h / .cpp   # Graph engine: tick, load, save, XML
-│   │   └── nodes/
+│   │   └── Nodes/
 │   │       ├── IONodes.h              # Bool/Number Input/Output, Constant Number, Property/Tooltip nodes
 │   │       ├── LogicNodes.h           # AND, OR, NOT, XOR, NAND, NOR, Constant On, SR, JK, Pulse nodes
 │   │       ├── MathNodes.h            # Add, Subtract, Multiply, Divide, Clamp, Threshold, Delta, Switchbox, etc.
