@@ -41,7 +41,7 @@ class DivideNode : public Node {
 public:
     DivideNode() : Node(NodeType::Divide, "Divide") {
         inputs  = { Port::makeNumber("A"), Port::makeNumber("B") };
-        outputs = { Port::makeNumber("Out"), Port::makeBool("IsError") };
+        outputs = { Port::makeNumber("Out"), Port::makeBool("Err") };
     }
     void evaluate() override {
         double b = inputNumber(1);
@@ -60,7 +60,7 @@ public:
     double maxBound = 1.0;
 
     ClampNode() : Node(NodeType::Clamp, "Clamp") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {
@@ -73,7 +73,7 @@ public:
 class AbsNode : public Node {
 public:
     AbsNode() : Node(NodeType::Abs, "Abs") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override { outputNumber(0, std::abs(inputNumber(0))); }
@@ -102,7 +102,7 @@ public:
     double maxBound = 1.0;
 
     ThresholdNode() : Node(NodeType::Threshold, "Threshold") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeBool("Out") };
     }
     void evaluate() override {
@@ -126,13 +126,34 @@ public:
     }
 };
 
+// ── NUMERICAL JUNCTION ────────────────────────────────────────────────────────
+// in[0]=Value, in[1]=Switch(bool) → out[0]=On path, out[1]=Off path.
+// The opposite of a switchbox: sends the value down the On path while Switch is
+// on and down the Off path otherwise; the path not chosen outputs 0.
+// Type 21 in Stormworks XML. Input order (Value in1, Switch in2) and output order
+// (On = first, Off = second via node_index="1") confirmed against a wired sample.
+// That the unchosen path outputs 0 is an assumption.
+class NumericalJunctionNode : public Node {
+public:
+    NumericalJunctionNode() : Node(NodeType::NumericalJunction, "Junction") {
+        inputs  = { Port::makeNumber("A"), Port::makeBool("Switch") };
+        outputs = { Port::makeNumber("On"), Port::makeNumber("Off") };
+    }
+    void evaluate() override {
+        const double v  = inputNumber(0);
+        const bool   on = inputBool(1);
+        outputNumber(0, on ? v   : 0.0);
+        outputNumber(1, on ? 0.0 : v);
+    }
+};
+
 // ── DELTA ─────────────────────────────────────────────────────────────────────
 // Out = change in the input since the previous tick (current - previous).
 // The previous value starts at 0, so the first tick outputs the input itself.
 class DeltaNode : public Node {
 public:
     DeltaNode() : Node(NodeType::Delta, "Delta") {
-        inputs  = { Port::makeNumber("Value") };
+        inputs  = { Port::makeNumber("A") };
         outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {

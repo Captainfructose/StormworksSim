@@ -369,6 +369,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         double  propStep  = 1.0;            // <int text="X"/> (slider step)
         QString textN;                      // n="..." (property name)
         bool    propBool = false;           // v="true" (property toggle)
+        QString valueText;                  // v="..." (property text's value)
         QString tipLabel = "value";         // l="..." (tooltips)
         QString tipOn    = "on";            // on="..." (tooltip on/off)
         QString tipOff   = "off";           // off="..."
@@ -488,7 +489,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             info.propStep = intElem.attribute("value", intElem.attribute("text", "1")).toDouble();
         if (obj.hasAttribute("script")) info.script = obj.attribute("script");
         if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
-        if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
+        if (obj.hasAttribute("v")) {
+            info.propBool  = (obj.attribute("v") == "true");
+            info.valueText = obj.attribute("v");
+        }
         if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
         if (obj.hasAttribute("on")) {
             info.tipOn   = obj.attribute("on");
@@ -538,6 +542,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             else if (typeStr == "3") ntype = NodeType::NumberOutput;   // number output (has input wire)
             else if (typeStr == "4") ntype = NodeType::CompositeInput; // composite input (source)
             else if (typeStr == "5") ntype = NodeType::CompositeOutput; // composite output (has input wire)
+            else if (typeStr == "6") ntype = NodeType::VideoInput;      // video input (source)
+            else if (typeStr == "7") ntype = NodeType::VideoOutput;     // video output (has input wire)
+            else if (typeStr == "8") ntype = NodeType::AudioInput;      // audio input (source)
+            else if (typeStr == "9") ntype = NodeType::AudioOutput;     // audio output (has input wire)
             else                     ntype = NodeType::BoolInput;      // no type = bool input (source)
 
             QDomElement obj = c.firstChildElement("object");
@@ -677,8 +685,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             pt->value        = info.propBool;
         }
         if (info.type == NodeType::PropertyText) {
+            auto* pt = static_cast<PropertyTextNode*>(n.get());
             if (!info.textN.isEmpty())
-                static_cast<PropertyTextNode*>(n.get())->propertyName = info.textN;
+                pt->propertyName = info.textN;
+            pt->text = info.valueText;
         }
         if (info.type == NodeType::TooltipNumber) {
             static_cast<TooltipNumberNode*>(n.get())->tooltipLabel = info.tipLabel;
@@ -829,6 +839,7 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 13: return NodeType::MemoryRegister;
         case 12: return NodeType::Threshold;
         case 14: return NodeType::Abs;
+        case 21: return NodeType::NumericalJunction;
         case 22: return NodeType::NumericalSwitchbox;
         case 35: return NodeType::Delta;
         case 38: return NodeType::Modulo;
@@ -880,6 +891,8 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 27: return NodeType::Blinker;
         case 54: return NodeType::NumberToBinary;
         case 56: return NodeType::LuaScript;
+        case 57: return NodeType::VideoSwitchbox;
+        case 59: return NodeType::AudioSwitchbox;
         case 55: return NodeType::BinaryToNumber;
 
         // ── Composite ─────────────────────────────────────────────────────────
@@ -926,6 +939,7 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Clamp:    return 11;
         case NodeType::Abs:      return 14;
         case NodeType::Threshold:          return 12;
+        case NodeType::NumericalJunction:  return 21;
         case NodeType::NumericalSwitchbox: return 22;
         case NodeType::Delta:    return 35;
         case NodeType::Modulo:   return 38;
@@ -963,6 +977,8 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Blinker:             return 27;
         case NodeType::NumberToBinary:      return 54;
         case NodeType::LuaScript:           return 56;
+        case NodeType::VideoSwitchbox:      return 57;
+        case NodeType::AudioSwitchbox:      return 59;
         case NodeType::BinaryToNumber:      return 55;
         case NodeType::PushToToggle:        return 28;
         case NodeType::ToggleToPush:        return 48;
@@ -1051,6 +1067,10 @@ bool Microcontroller::saveToFileAs(const QString& path, QString& errorMsg)
             case NodeType::NumberOutput:
             case NodeType::CompositeInput:
             case NodeType::CompositeOutput:
+            case NodeType::VideoInput:
+            case NodeType::VideoOutput:
+            case NodeType::AudioInput:
+            case NodeType::AudioOutput:
                 originalBridgeIds_[id] = true;
                 break;
             default:
@@ -1153,6 +1173,10 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 case NodeType::NumberOutput:
                 case NodeType::CompositeInput:
                 case NodeType::CompositeOutput:
+                case NodeType::VideoInput:
+                case NodeType::VideoOutput:
+                case NodeType::AudioInput:
+                case NodeType::AudioOutput:
                     isBridge = true;
                     break;
                 default: break;
@@ -1212,9 +1236,13 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 else           obj.removeAttribute("v");
                 return true;
             }
-            case NodeType::PropertyText:
-                obj.setAttribute("n", static_cast<const PropertyTextNode*>(n)->propertyName);
+            case NodeType::PropertyText: {
+                auto* pt = static_cast<const PropertyTextNode*>(n);
+                obj.setAttribute("n", pt->propertyName);
+                if (pt->text.isEmpty()) obj.removeAttribute("v");
+                else                    obj.setAttribute("v", pt->text);
                 return true;
+            }
             case NodeType::TooltipNumber:
                 obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
                 return true;
@@ -1529,13 +1557,19 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             c = next;
         }
     }
+    // Board slots the deleted connectors occupied; used below to shrink the board
+    std::set<std::pair<int,int>> deletedSlots;
     if (!deletedBridgeIds.empty()) {
         QDomElement nodesEl = root.firstChildElement("nodes");
         QDomElement n = nodesEl.firstChildElement("n");
         while (!n.isNull()) {
             QDomElement nextN = n.nextSiblingElement("n");
-            if (deletedBridgeIds.count(n.attribute("component_id", "-1").toInt()))
+            if (deletedBridgeIds.count(n.attribute("component_id", "-1").toInt())) {
+                const QDomElement pos = n.firstChildElement("node").firstChildElement("position");
+                deletedSlots.insert({ pos.attribute("x", "0").toInt(),
+                                      pos.attribute("z", "0").toInt() });
                 nodesEl.removeChild(n);
+            }
             n = nextN;
         }
     }
@@ -1559,6 +1593,10 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             case NodeType::NumberOutput:    out = { "3",     false, "1"     }; return true;
             case NodeType::CompositeInput:  out = { "4",     true,  "5"     }; return true;
             case NodeType::CompositeOutput: out = { "5",     false, "5"     }; return true;
+            case NodeType::VideoInput:      out = { "6",     true,  "6"     }; return true;
+            case NodeType::VideoOutput:     out = { "7",     false, "6"     }; return true;
+            case NodeType::AudioInput:      out = { "8",     true,  "7"     }; return true;
+            case NodeType::AudioOutput:     out = { "9",     false, "7"     }; return true;
             default: return false;
         }
     };
@@ -1643,10 +1681,34 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         nodesElem.appendChild(n);
     }
 
-    if (!newBridgeIds.empty()) {
-        root.setAttribute("length", boardL); // may have grown to fit new connectors
+    // Shrink the board by any trailing row or column that deleting connectors
+    // just emptied. Only rows/columns a deleted connector was in are considered,
+    // so slack the user left in the board on purpose is not taken away.
+    auto lineUsed = [&](bool isRow, int index) {
+        const int span = isRow ? boardW : boardL;
+        for (int i = 0; i < span; ++i)
+            if (usedSlots.count(isRow ? std::make_pair(i, index) : std::make_pair(index, i)))
+                return true;
+        return false;
+    };
+    auto lineHadDeleted = [&](bool isRow, int index) {
+        for (const auto& s : deletedSlots)
+            if ((isRow ? s.second : s.first) == index) return true;
+        return false;
+    };
+    while (boardL > 1 && !lineUsed(true, boardL - 1) && lineHadDeleted(true, boardL - 1))
+        --boardL;
+    while (boardW > 1 && !lineUsed(false, boardW - 1) && lineHadDeleted(false, boardW - 1))
+        --boardW;
+
+    // Write back the board size if it changed (grown for new connectors, or shrunk)
+    if (boardL != root.attribute("length", "1").toInt())
+        root.setAttribute("length", boardL);
+    if (boardW != root.attribute("width", "1").toInt())
+        root.setAttribute("width", boardW);
+
+    if (!newBridgeIds.empty())
         root.setAttribute("id_counter_node", lastNodeId);
-    }
 
     // id_counter holds the highest component id in use; keep it ahead of every
     // node id this session created so the game never reuses one

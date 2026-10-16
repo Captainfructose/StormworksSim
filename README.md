@@ -10,8 +10,12 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 
 ### Node Graph Editor
 - Visual node graph canvas with a **40×40 pixel grid** that all nodes snap to
+- A **fixed-size board** (80 × 48 cells) like the game's editor: the grid stops at the board's edge, nodes can't be dragged off it, and panning and zoom are limited to it. The size is set by `kBoard…` constants in `NodeGraphView.h`.
 - **Pan** with middle-mouse drag, **zoom** with scroll wheel
-- **Right-click** anywhere on the canvas to add nodes via a categorized context menu
+- **Adding nodes**, three ways — all built from one shared node list (`NodeCatalog.h`):
+  - **Right-click** the canvas → Add Node: the node appears where you clicked
+  - **Add Node** in the menu bar: the node appears in the middle of the view
+  - **Tab** opens a **palette** of node tiles grouped by category, like the game's: click a tile to add it where the mouse was. A search box filters as you type (**Enter** adds the first match), and **Esc** or a click on the canvas closes it.
 - **Left-click drag** from an output port to wire nodes together
 - **Left-click** an occupied input port to detach and rewire an existing connection
 - Wire colors indicate signal type, and only matching types can be connected:
@@ -23,13 +27,16 @@ The editor is styled after the in-game microcontroller editor: a teal board with
 - **Delete/Backspace** key removes the selected node along with all its connections
 - Right-click a node to delete it directly from the context menu
 - Nodes with settings have a **⚙** button in the header
-- Video and audio have not been implemented yet.
+- Hover a port to see its **full label and type** in a tooltip (labels on the node itself are kept short)
+- Video and audio wires are **aqua** and **olive**. The simulator has no pictures or sound, so a video or audio signal is just the name of the source it comes from — a Video/Audio Output's panel shows which input is being routed to it.
 
 ### Node Appearance
-- White rounded nodes with a light header strip and a grey **display panel** that shows live state: bool indicators fill when true, number ports show their current value
+- Nodes are **4 grid squares wide**, like in the game. Each is a white rounded block with a small grey **icon** (a short glyph such as `&`, `+`, `Δ` or `fx`) and a **bold** title at the top left. There is no header strip.
+- A grey **display panel** in the middle shows live state: bool indicators fill when true, number ports show their current value. The panel is normally 86 px wide and **shrinks automatically** (to at least 50 px) when a port label needs more room; labels that still don't fit are shortened with "…".
+- **Math nodes show their live equation on one line** in the panel instead of separate values, for example `3 + 4 = 7`, `3 > 2 → ON`, or `0 ≤ 12.5 ≤ 100 → ON` for Threshold. Values are **bold**, operators plain; the font shrinks to fit.
 - Property nodes show their **property name** above their current value in the panel
-- **SR Latch** and **JK Flip-Flop** use the in-game look: a small grey icon with the node's letters, a small title, labelled ports, and no header strip or panel
-- I/O nodes show their **connector label** as the header title when one is set
+- **SR Latch** and **JK Flip-Flop** use the game's layout more closely: icon with the node's letters, labelled ports, and no display panel
+- I/O nodes show their **connector label** as the title when one is set
 
 ### Live Simulation
 - Tick-based simulation engine evaluating nodes in **topological order**.
@@ -54,7 +61,7 @@ A composite wire carries **32 number channels and 32 bool channels**, numbered 1
 - A microcontroller built from scratch (nothing loaded) can be saved too — it starts from the empty skeleton Stormworks writes for a new microcontroller.
 - Files saved from this app load correctly in the Stormworks game.
 - **Node positions are saved.** Positions are converted back to Stormworks grid units (rounded to 0.25) so layouts carry over to the game.
-- **I/O connectors are fully saved:** new Bool/Number/Composite Input and Output nodes are written (component entry plus edge connector, in the first free board slot — the board grows by one row when full), and deleted ones are removed from both places.
+- **I/O connectors are fully saved:** new Bool/Number/Composite Input and Output nodes are written (component entry plus edge connector, in the first free board slot — the board grows by one row when full), and deleted ones are removed from both places. Deleting connectors also shrinks the board by any trailing row or column they emptied; slack you left in the board on purpose is kept.
 - **Connector labels** are loaded from and saved to the file. Edit one from the node's ⚙ dialog.
 - Wires from a node's **second or later output** (for example the `!Q` output of an SR Latch) are loaded and saved using the file's `node_index` attribute.
 - Lua scripts keep their line breaks and tabs through load and save.
@@ -76,6 +83,10 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Number Output    | 3           | Number signal going out from the MC                                   |
 | Composite Input  | 4           | Composite wire coming into the MC — channels set up in the I/O panel  |
 | Composite Output | 5           | Composite wire going out from the MC                                  |
+| Video Input      | 6           | Video signal coming into the MC                                       |
+| Video Output     | 7           | Video signal going out from the MC                                    |
+| Audio Input      | 8           | Audio signal coming into the MC                                       |
+| Audio Output     | 9           | Audio signal going out from the MC                                    |
 
 ### Logic
 |       Node       | Type ID |                       Description                        |
@@ -101,7 +112,7 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Add                 | 6       | A + B                                                                |
 | Subtract            | 7       | A − B                                                                |
 | Multiply            | 8       | A × B                                                                |
-| Divide              | 9       | A ÷ B (IsError output goes true on divide-by-zero)                   |
+| Divide              | 9       | A ÷ B (the Err output goes true on divide-by-zero)                   |
 | Clamp               | 11      | Clamp value to [min, max] — bounds configurable via settings         |
 | Threshold           | 12      | True while min ≤ value ≤ max — bounds configurable via settings      |
 | Abs                 | 14      | Absolute value                                                       |
@@ -109,6 +120,7 @@ These are the microcontroller's connections to the vehicle. Each has a **label**
 | Greater Than        | 17      | A > B → bool                                                         |
 | Less Than           | 18      | A < B → bool                                                         |
 | Numerical Switchbox | 22      | On value / Off value / Switch → outputs the value the switch selects |
+| Numerical Junction  | 21      | Value / Switch → sends the value down the On or Off output (the other is 0) |
 | Delta               | 35      | Change in the input since the previous tick                          |
 | Modulo              | 38      | A mod B                                                              |
 | Equal To            | 42      | \|A − B\| ≤ tolerance → bool — tolerance configurable via settings  |
@@ -133,6 +145,8 @@ The expression is edited in the node's ⚙ dialog, which lists the supported ope
 | Number to Binary         | 54      | Number → the 32 bool channels of a composite (bits of a signed 32-bit integer)      |
 | Binary to Number         | 55      | The 32 bool channels of a composite → number                                        |
 | Lua Script               | 56      | Composite in/out with a script — stored and saved, **not executed**                 |
+| Video Switchbox          | 57      | Video On / Video Off / Switch → outputs the video the switch selects                |
+| Audio Switchbox          | 59      | Audio On / Audio Off / Switch → outputs the audio the switch selects                |
 | Composite Packer         | —       | Simulator-only helper: packs number inputs Ch1..ChN into one composite              |
 
 ### Stateful
@@ -155,7 +169,7 @@ The expression is edited in the node's ⚙ dialog, which lists the supported ope
 | Property Slider  | 19      | Named number with a minimum, maximum, step and value                             |
 | Property Toggle  | 33      | Named on/off switch                                                              |
 | Property Number  | 34      | Named number value                                                               |
-| Property Text    | 58      | Named text property (name only; it has no ports)                                 |
+| Property Text    | 58      | Named text property with a text value (it has no ports; used by Lua scripts)     |
 | Tooltip Number   | 43      | Shows a number input in the vehicle tooltip under a label                        |
 | Tooltip On/Off   | 44      | Shows a bool input in the tooltip as one of two texts                            |
 
@@ -169,17 +183,15 @@ The panel on the right side of the window shows all MC edge ports. Each row uses
 - **Bool inputs** — toggle button (click to flip ON/OFF).
 - **Number inputs** — spinbox + slider with configurable step size (shown below the slider).
 - **Composite inputs** — inline channel count, per-channel index, type (bool/number), and value control.
-- **Video inputs** - not implemented yet.
-- **Audio inputs** - not implemented yet.
+- **Video / Audio inputs** — not shown in the panel (there is nothing to set); they are connector nodes on the canvas.
 
 **Outputs:**
 - **Bool outputs** — indicator LED (green = ON, dark red = OFF)
 - **Number outputs** — live readout in cyan monospace text
 - **Composite outputs** - not shown in the panel (a composite has no single value).
-- **Video outputs** - not implemented yet.
-- **Audio outputs** - not implemented yet.
+- **Video / Audio outputs** — not shown in the panel; the output node's grey panel shows its source.
 
-The panel is rebuilt when a file is loaded, so a connector label edited in a node's ⚙ dialog shows there the next time the microcontroller is loaded.
+The panel is rebuilt when a file is loaded or when nodes are added or removed. Renaming a connector label in a node's ⚙ dialog updates the matching row title straight away, without resetting any of the panel's controls.
 
 ---
 
@@ -247,7 +259,9 @@ StormworksSim/
 │   │       └── FunctionNodes.h        # Function / Bool Function expression evaluators
 │   └── gui/
 │       ├── MainWindow.h / .cpp        # Main window, menus, file I/O, sim control
-│       ├── NodeGraphView.h / .cpp     # Canvas: grid, pan/zoom, wire dragging, context menu
+│       ├── NodeGraphView.h / .cpp     # Canvas: board, grid, pan/zoom, wire dragging, Add Node menus
+│       ├── NodeCatalog.h              # The shared list of addable nodes, by category
+│       ├── NodePalette.h / .cpp       # Tab palette: searchable tiles of node types
 │       ├── NodeGraphItem.h / .cpp     # Per-node visual: drawing, gate symbols, settings dialogs
 │       ├── ConnectionItem.h / .cpp    # Wire visual (straight line with arrows, color by type)
 │       └── IOPanel.h / .cpp           # Right-side I/O controls panel
@@ -263,13 +277,12 @@ StormworksSim/
 ## Known Limitations
 
 - **Lua scripts are not run.** A Lua Script node keeps, edits and saves its script, but its output composite stays empty. Running scripts would need an embedded Lua interpreter and the Stormworks `input`, `output` and `property` functions; `onDraw` and `screen` drawing cannot work without a monitor.
-- **Video and audio** signals are not implemented.
-- **Property Text** saves only its name; where the game stores its text value is not known yet.
+- **Video and audio** are routing only: inputs, outputs and switchboxes work and save, but there is no picture or sound, and no other video/audio nodes.
 - **Property Toggle** stores its on/off state as `v="true"` (absent when off) based on sample files; other property nodes' attribute names were also taken from samples.
 - **Binary conversions** treat channel 1 as the least significant bit of a signed 32-bit integer — check this against the game.
 - **Blinker** new nodes default to 0.5 s on / 0.5 s off; the in-game defaults are not confirmed.
-- **Node spacing:** simulator nodes are wider than Stormworks nodes (6 grid cells against about 4), so layouts look more spread out in the game, and layouts loaded from the game can overlap here.
-- Deleting I/O nodes does not shrink the board, and the I/O panel does not refresh when a connector label is renamed.
+- **Board size:** the 80 × 48 board is an estimate, not the game's exact work-area size.
+- **Palette icons** are the same short text glyphs the nodes use, not the game's drawn icons.
 - A few Stormworks nodes are still missing; each needs a sample file to get its type ID and settings.
 - The simulator's Composite Packer is not a Stormworks node and is not written to saved files.
 

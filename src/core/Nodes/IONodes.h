@@ -141,12 +141,12 @@ public:
 };
 
 // ── PROPERTY TEXT ─────────────────────────────────────────────────────────────
-// A text property (for Lua scripts); it has no logic ports. Type 58: n="name".
-// Where the text value itself is stored in the file isn't known yet, so only
-// the property name is modelled.
+// A text property (for Lua scripts); it has no logic ports. Type 58: n="name" is
+// the property name and v="text" is its text value (absent when empty).
 class PropertyTextNode : public Node {
 public:
     QString propertyName = "Label";
+    QString text;
 
     PropertyTextNode() : Node(NodeType::PropertyText, "Property Text") {}
     void evaluate() override {}

@@ -1,4 +1,4 @@
-#include "NodeGraphView.h"
+﻿#include "NodeGraphView.h"
 
 #include <QWheelEvent>
 #include <QMouseEvent>
@@ -8,6 +8,12 @@
 #include <QPen>
 #include <QMenu>
 #include <QAction>
+#include <QCursor>
+#include <QEnterEvent>
+#include <QShortcut>
+
+#include "NodeCatalog.h"
+#include "NodePalette.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constructor
@@ -23,42 +29,127 @@ NodeGraphView::NodeGraphView(QWidget* parent)
     setDragMode(QGraphicsView::NoDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     setResizeAnchor(QGraphicsView::AnchorUnderMouse);
-    setSceneRect(-10000, -10000, 20000, 20000);
+    // The scene is exactly the board; items and the view are confined to it
+    scene_->setSceneRect(boardRect());
     setMouseTracking(true);
 
     // Allow this widget to receive key events (Delete key for node removal)
     setFocusPolicy(Qt::StrongFocus);
+
+    // ── Tab palette ───────────────────────────────────────────────────────────
+    // Tab opens (and closes) a panel of node tiles over the view. A shortcut is
+    // used because a plain key handler never sees Tab — it moves keyboard focus.
+    palette_ = new NodePalette(this);
+    connect(palette_, &NodePalette::nodeChosen, this, [this](NodeType type) {
+        if (mc_) addNodeAt(type, freeSpotNear(paletteSpawn_));
+    });
+
+    auto* tabShortcut = new QShortcut(QKeySequence(Qt::Key_Tab), this);
+    tabShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(tabShortcut, &QShortcut::activated, this, &NodeGraphView::togglePalette);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// drawBackground — faint grid lines at the snap interval
+// togglePalette — open the Tab palette, or close it if it is already open
+//
+// The node is added where the mouse was when the palette was opened (or in the
+// middle of the view if the mouse was elsewhere).
+// ─────────────────────────────────────────────────────────────────────────────
+void NodeGraphView::togglePalette()
+{
+    if (palette_->isVisible()) {
+        palette_->closePalette();
+        return;
+    }
+    if (!mc_) return;
+
+    const QPoint local = viewport()->mapFromGlobal(QCursor::pos());
+    paletteSpawn_ = viewport()->rect().contains(local)
+                        ? snapToGrid(mapToScene(local))
+                        : defaultSpawnPoint();
+
+    positionPalette();
+    palette_->openPalette();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// positionPalette — centre the palette over the view, leaving a margin
+// ─────────────────────────────────────────────────────────────────────────────
+void NodeGraphView::positionPalette()
+{
+    const int w = std::max(240, std::min(width()  - 32, 820));
+    const int h = std::max(200, std::min(height() - 32, 600));
+    palette_->setGeometry((width() - w) / 2, (height() - h) / 2, w, h);
+}
+
+void NodeGraphView::resizeEvent(QResizeEvent* event)
+{
+    QGraphicsView::resizeEvent(event);
+    if (palette_ && palette_->isVisible())
+        positionPalette();
+}
+
+// Give the view keyboard focus when the mouse enters it, so Tab opens the
+// palette without having to click the canvas first
+void NodeGraphView::enterEvent(QEnterEvent* event)
+{
+    QGraphicsView::enterEvent(event);
+    if (!palette_->isVisible())
+        setFocus();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// drawBackground — the board: teal grid inside, a dark margin outside it
 // ─────────────────────────────────────────────────────────────────────────────
 void NodeGraphView::drawBackground(QPainter* painter, const QRectF& rect)
 {
-    QGraphicsView::drawBackground(painter, rect);
+    const QRectF board = boardRect();
+
+    // Everything off the board is a flat dark colour
+    QPainterPath outside;
+    outside.addRect(rect);
+    QPainterPath boardPath;
+    boardPath.addRect(board);
+    painter->fillPath(outside.subtracted(boardPath), QColor(0x1f, 0x2a, 0x30));
+
+    // The board itself, and its grid lines (kept inside the board)
+    const QRectF area = rect.intersected(board);
+    if (area.isEmpty()) return;
+    painter->fillRect(area, backgroundBrush());
 
     QPen gridPen(QColor(0x46, 0x8c, 0xa0)); // darker teal, as in Stormworks
     gridPen.setWidth(0); // cosmetic, always 1px regardless of zoom
     painter->setPen(gridPen);
 
-    // Align the first line to the nearest grid boundary at or before rect's edge
-    qreal left = std::floor(rect.left() / kGridCellW) * kGridCellW;
-    qreal top  = std::floor(rect.top()  / kGridCellH) * kGridCellH;
+    // Align the first line to the nearest grid boundary at or before the edge
+    qreal left = std::floor(area.left() / kGridCellW) * kGridCellW;
+    qreal top  = std::floor(area.top()  / kGridCellH) * kGridCellH;
 
-    for (qreal x = left; x < rect.right(); x += kGridCellW)
-        painter->drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()));
+    for (qreal x = left; x <= area.right(); x += kGridCellW)
+        painter->drawLine(QPointF(x, area.top()), QPointF(x, area.bottom()));
 
-    for (qreal y = top; y < rect.bottom(); y += kGridCellH)
-        painter->drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y));
+    for (qreal y = top; y <= area.bottom(); y += kGridCellH)
+        painter->drawLine(QPointF(area.left(), y), QPointF(area.right(), y));
+
+    // A darker outline marks the edge of the board
+    QPen edgePen(QColor(0x2e, 0x66, 0x78));
+    edgePen.setWidth(0);
+    painter->setPen(edgePen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(board);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// snapToGrid — round a scene position to the nearest grid intersection
+// snapToGrid — round a scene position to the nearest grid intersection, kept on
+// the board so a node's top-left never lands outside it
 // ─────────────────────────────────────────────────────────────────────────────
 QPointF NodeGraphView::snapToGrid(const QPointF& scenePos) const
 {
+    const QRectF board = boardRect();
     qreal x = std::round(scenePos.x() / kGridCellW) * kGridCellW;
     qreal y = std::round(scenePos.y() / kGridCellH) * kGridCellH;
+    x = std::clamp(x, board.left(), board.right()  - kGridCellW);
+    y = std::clamp(y, board.top(),  board.bottom() - kGridCellH);
     return QPointF(x, y);
 }
 
@@ -78,6 +169,7 @@ void NodeGraphView::loadMicrocontroller(Microcontroller* mc)
         nodePtr->posY = (int)snapped.y();
 
         auto* item = new NodeGraphItem(nodePtr.get());
+        item->onLabelChanged = [this]() { emit labelsChanged(); };
         scene_->addItem(item);
         nodeItems_[id] = item;
     }
@@ -218,6 +310,7 @@ void NodeGraphView::addNodeAt(NodeType type, const QPointF& snappedScenePos)
     if (!rawNode) return;
 
     auto* item = new NodeGraphItem(rawNode);
+    item->onLabelChanged = [this]() { emit labelsChanged(); };
     scene_->addItem(item);
     nodeItems_[newId] = item;
 
@@ -327,98 +420,69 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
         menu.addSeparator();
     }
 
-    QPointF snappedPos = snapToGrid(sceneClickPos);
-
-    // ── Add Node submenu, grouped by category ─────────────────────────────────
+    // Add Node submenu: new nodes go where the menu was opened (grid-snapped)
+    const QPointF snappedPos = snapToGrid(sceneClickPos);
     QMenu* addMenu = menu.addMenu("Add Node");
-
-    auto addEntry = [&](QMenu* parentMenu, const QString& label, NodeType type) {
-        QAction* act = parentMenu->addAction(label);
-        connect(act, &QAction::triggered, this, [this, type, snappedPos]() {
-            addNodeAt(type, snappedPos);
-        });
-    };
-
-    QMenu* ioMenu = addMenu->addMenu("I/O");
-    addEntry(ioMenu, "Bool Input",      NodeType::BoolInput);
-    addEntry(ioMenu, "Bool Output",     NodeType::BoolOutput);
-    addEntry(ioMenu, "Number Input",    NodeType::NumberInput);
-    addEntry(ioMenu, "Number Output",   NodeType::NumberOutput);
-
-    QMenu* compositeMenu = addMenu->addMenu("Composite");
-    addEntry(compositeMenu, "Composite Input",       NodeType::CompositeInput);
-    addEntry(compositeMenu, "Composite Output",      NodeType::CompositeOutput);
-    addEntry(compositeMenu, "Composite Packer",      NodeType::CompositePacker);
-    addEntry(compositeMenu, "Composite Read Number", NodeType::CompositeReadNumber);
-    addEntry(compositeMenu, "Composite Read Bool",   NodeType::CompositeReadBool);
-    addEntry(compositeMenu, "Composite Write Number", NodeType::CompositeWriteNumber);
-    addEntry(compositeMenu, "Composite Write Bool",   NodeType::CompositeWriteBool);
-    addEntry(compositeMenu, "Composite Switchbox",    NodeType::CompositeSwitchbox);
-    addEntry(compositeMenu, "Lua Script",             NodeType::LuaScript);
-    addEntry(compositeMenu, "Binary to Number",       NodeType::BinaryToNumber);
-    addEntry(compositeMenu, "Number to Binary",       NodeType::NumberToBinary);
-
-    QMenu* logicMenu = addMenu->addMenu("Logic");
-    addEntry(logicMenu, "AND",  NodeType::And);
-    addEntry(logicMenu, "OR",   NodeType::Or);
-    addEntry(logicMenu, "NOT",  NodeType::Not);
-    addEntry(logicMenu, "XOR",  NodeType::Xor);
-    addEntry(logicMenu, "NAND", NodeType::Nand);
-    addEntry(logicMenu, "NOR",  NodeType::Nor);
-    addEntry(logicMenu, "Constant On", NodeType::ConstantOn);
-    addEntry(logicMenu, "SR Latch",     NodeType::SRLatch);
-    addEntry(logicMenu, "JK Flip-Flop", NodeType::JKFlipFlop);
-    addEntry(logicMenu, "Capacitor",    NodeType::Capacitor);
-    addEntry(logicMenu, "Push to Toggle", NodeType::PushToToggle);
-    addEntry(logicMenu, "Toggle to Push", NodeType::ToggleToPush);
-
-    QMenu* mathMenu = addMenu->addMenu("Math");
-    addEntry(mathMenu, "Add",          NodeType::Add);
-    addEntry(mathMenu, "Subtract",     NodeType::Subtract);
-    addEntry(mathMenu, "Multiply",     NodeType::Multiply);
-    addEntry(mathMenu, "Divide",       NodeType::Divide);
-    addEntry(mathMenu, "Clamp",        NodeType::Clamp);
-    addEntry(mathMenu, "Abs",          NodeType::Abs);
-    addEntry(mathMenu, "Modulo",       NodeType::Modulo);
-    addEntry(mathMenu, "Delta",        NodeType::Delta);
-    addEntry(mathMenu, "Threshold",    NodeType::Threshold);
-    addEntry(mathMenu, "Switchbox",    NodeType::NumericalSwitchbox);
-    addEntry(mathMenu, "Constant Number", NodeType::NumberLiteral);
-    addEntry(mathMenu, "Greater Than", NodeType::GreaterThan);
-    addEntry(mathMenu, "Less Than",    NodeType::LessThan);
-    addEntry(mathMenu, "Equal To",     NodeType::EqualTo);
-
-    QMenu* statefulMenu = addMenu->addMenu("Stateful");
-    addEntry(statefulMenu, "Up/Down Counter",     NodeType::UpDownCounter);
-    addEntry(statefulMenu, "Memory Register",     NodeType::MemoryRegister);
-    addEntry(statefulMenu, "Blinker",             NodeType::Blinker);
-    statefulMenu->addSeparator();
-    addEntry(statefulMenu, "TON Timer",           NodeType::TimerTON);
-    addEntry(statefulMenu, "TOF Timer",           NodeType::TimerTOF);
-    addEntry(statefulMenu, "RTO Timer",           NodeType::TimerRTO);
-    addEntry(statefulMenu, "RTF Timer",           NodeType::TimerRTF);
-    statefulMenu->addSeparator();
-    addEntry(statefulMenu, "PID Controller",      NodeType::PIDController);
-    addEntry(statefulMenu, "PID Advanced",        NodeType::PIDControllerAdvanced);
-
-    QMenu* propertyMenu = addMenu->addMenu("Property");
-    addEntry(propertyMenu, "Dropdown",        NodeType::PropertyDropdown);
-    addEntry(propertyMenu, "Number",          NodeType::PropertyNumber);
-    addEntry(propertyMenu, "Slider",          NodeType::PropertySlider);
-    addEntry(propertyMenu, "Toggle",          NodeType::PropertyToggle);
-    addEntry(propertyMenu, "Text",            NodeType::PropertyText);
-    propertyMenu->addSeparator();
-    addEntry(propertyMenu, "Tooltip Number",  NodeType::TooltipNumber);
-    addEntry(propertyMenu, "Tooltip On/Off",  NodeType::TooltipOnOff);
-
-    QMenu* funcMenu = addMenu->addMenu("Function");
-    addEntry(funcMenu, "Function (1 input)",      NodeType::Function1);
-    addEntry(funcMenu, "Function (3 inputs)",     NodeType::Function3);
-    addEntry(funcMenu, "Function (8 inputs)",     NodeType::Function8);
-    addEntry(funcMenu, "Bool Function (4 inputs)", NodeType::FunctionBool4);
-    addEntry(funcMenu, "Bool Function (8 inputs)", NodeType::FunctionBool8);
+    populateAddNodeMenu(addMenu, [snappedPos]() { return snappedPos; });
 
     menu.exec(mapToGlobal(viewPos));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// populateAddNodeMenu
+//
+// Fills `addMenu` with the categorized list of node types. Choosing an entry
+// adds that node at the scene position returned by `spawnPos()` at the moment of
+// the click. Shared by the right-click menu and the menu bar's "Add Node".
+// ─────────────────────────────────────────────────────────────────────────────
+void NodeGraphView::populateAddNodeMenu(QMenu* addMenu, std::function<QPointF()> spawnPos)
+{
+    // One submenu per category, in catalog order (entries of a category are adjacent)
+    QMenu*  current = nullptr;
+    QString currentCategory;
+
+    for (const NodeCatalogEntry& entry : nodeCatalog()) {
+        if (!current || entry.category != currentCategory) {
+            currentCategory = entry.category;
+            current = addMenu->addMenu(currentCategory);
+        }
+        if (entry.separatorBefore)
+            current->addSeparator();
+
+        const NodeType type = entry.type;
+        QAction* act = current->addAction(entry.label);
+        connect(act, &QAction::triggered, this, [this, type, spawnPos]() {
+            if (!mc_) return;
+            addNodeAt(type, spawnPos());
+        });
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// defaultSpawnPoint — where the menu-bar "Add Node" puts a new node
+//
+// The middle of the visible area, snapped to the grid. If a node is already
+// there, steps diagonally by one cell until it finds a free spot so nodes
+// added one after another don't stack on top of each other.
+// ─────────────────────────────────────────────────────────────────────────────
+QPointF NodeGraphView::defaultSpawnPoint() const
+{
+    const QPointF center = mapToScene(viewport()->rect().center());
+    return freeSpotNear(snapToGrid(center - QPointF(NodeGraphItem::kWidth / 2.0,
+                                                    NodeGraphItem::kGridCell)));
+}
+
+// freeSpotNear — `spot` itself if no node is there, otherwise the nearest free
+// grid cell found by stepping diagonally
+QPointF NodeGraphView::freeSpotNear(QPointF spot) const
+{
+    auto occupied = [this](const QPointF& p) {
+        for (const auto& [id, item] : nodeItems_)
+            if (item && item->pos() == p) return true;
+        return false;
+    };
+    for (int i = 0; i < 64 && occupied(spot); ++i)
+        spot = snapToGrid(spot + QPointF(kGridCellW, kGridCellH));
+    return spot;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,6 +490,10 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
 // ─────────────────────────────────────────────────────────────────────────────
 void NodeGraphView::mousePressEvent(QMouseEvent* event)
 {
+    // A click on the canvas (outside the palette) dismisses the palette
+    if (palette_ && palette_->isVisible())
+        palette_->closePalette();
+
     if (event->button() == Qt::MiddleButton) {
         panning_ = true;
         lastMousePos_ = event->pos();
@@ -610,8 +678,17 @@ void NodeGraphView::keyPressEvent(QKeyEvent* event)
 void NodeGraphView::wheelEvent(QWheelEvent* event)
 {
     constexpr double kZoomFactor = 1.15;
-    if (event->angleDelta().y() > 0)
-        scale(kZoomFactor, kZoomFactor);
-    else
-        scale(1.0 / kZoomFactor, 1.0 / kZoomFactor);
+    constexpr double kMaxScale   = 4.0;
+
+    // Zooming out stops once the whole board fits in the window
+    const QRectF board = boardRect();
+    const double minScale = std::min(viewport()->width()  / board.width(),
+                                     viewport()->height() / board.height());
+
+    const double current = transform().m11();
+    double factor = (event->angleDelta().y() > 0) ? kZoomFactor : 1.0 / kZoomFactor;
+    const double target = std::clamp(current * factor, minScale, kMaxScale);
+    factor = target / current;
+    if (factor != 1.0)
+        scale(factor, factor);
 }

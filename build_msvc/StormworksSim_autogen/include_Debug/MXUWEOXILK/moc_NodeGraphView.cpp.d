@@ -165,11 +165,13 @@ C:/Users/Stale/OneDrive/Documents/Programming\ Projects/C++\ Projects/Stormworks
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QGraphicsPathItem \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QGraphicsScene \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QGraphicsView \
+  C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/QMenu \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qabstractscrollarea.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qframe.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qgraphicsitem.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qgraphicsscene.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qgraphicsview.h \
+  C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qmenu.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qscrollarea.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qsizepolicy.h \
   C:/Qt/6.11.1/msvc2022_64/include/QtWidgets/qtwidgets-config.h \

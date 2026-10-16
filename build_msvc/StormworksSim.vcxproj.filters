@@ -40,6 +40,9 @@
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodePalette.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\build_msvc\StormworksSim_autogen\EWIEGA46WW\qrc_resources_Debug.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -100,6 +103,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\IOPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodePalette.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Stale\OneDrive\Documents\Programming Projects\C++ Projects\StormworksSim\src\gui\NodeCatalog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

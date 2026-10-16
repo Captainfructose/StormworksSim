@@ -375,6 +375,12 @@
 			null
 		],
 		[
+			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodeCatalog.h",
+			"MU",
+			"MXUWEOXILK/moc_NodeCatalog.cpp",
+			null
+		],
+		[
 			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodeGraphItem.h",
 			"MU",
 			"MXUWEOXILK/moc_NodeGraphItem.cpp",
@@ -384,6 +390,12 @@
 			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodeGraphView.h",
 			"MU",
 			"MXUWEOXILK/moc_NodeGraphView.cpp",
+			null
+		],
+		[
+			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodePalette.h",
+			"MU",
+			"MXUWEOXILK/moc_NodePalette.cpp",
 			null
 		]
 	],
@@ -595,6 +607,11 @@
 		],
 		[
 			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodeGraphView.cpp",
+			"MU",
+			null
+		],
+		[
+			"C:/Users/Stale/OneDrive/Documents/Programming Projects/C++ Projects/StormworksSim/src/gui/NodePalette.cpp",
 			"MU",
 			null
 		],

@@ -2,3 +2,4 @@
 #include <MXUWEOXILK/moc_IOPanel.cpp>
 #include <MXUWEOXILK/moc_MainWindow.cpp>
 #include <MXUWEOXILK/moc_NodeGraphView.cpp>
+#include <MXUWEOXILK/moc_NodePalette.cpp>

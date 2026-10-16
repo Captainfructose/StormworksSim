@@ -32,7 +32,7 @@ public:
     CompositeInputNode() : Node(NodeType::CompositeInput, "Composite Input") {
         // Default: one number channel at index 1
         channels = { { 1, PortType::Number } };
-        outputs  = { Port::makeComposite("Composite") };
+        outputs  = { Port::makeComposite("Out") };
     }
 
     void setChannels(const std::vector<CompositeChannel>& ch) { channels = ch; }
@@ -54,10 +54,87 @@ public:
 class CompositeOutputNode : public Node {
 public:
     CompositeOutputNode() : Node(NodeType::CompositeOutput, "Composite Output") {
-        inputs  = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeComposite("In") };
         outputs = { Port::makeComposite("Value") }; // hidden; mirrors the other sink nodes
     }
     void evaluate() override { outputComposite(0, inputComposite(0)); }
+};
+
+// ── VIDEO INPUT (type 6 in components_bridge) ─────────────────────────────────
+// A video signal coming into the MC. The simulator has no pictures: a video
+// "value" is just the name of the source, so a switchbox's routing is visible.
+class VideoInputNode : public Node {
+public:
+    VideoInputNode() : Node(NodeType::VideoInput, "Video Input") {
+        outputs = { Port::makeVideo("Out") };
+    }
+    void evaluate() override {
+        outputVideo(0, label.isEmpty() ? QString("Video In %1").arg(id) : label);
+    }
+};
+
+// ── VIDEO OUTPUT (type 7 in components_bridge) ────────────────────────────────
+// A video signal leaving the MC. A pure sink, like the other output nodes; its
+// panel shows which source is feeding it.
+class VideoOutputNode : public Node {
+public:
+    VideoOutputNode() : Node(NodeType::VideoOutput, "Video Output") {
+        inputs  = { Port::makeVideo("In") };
+        outputs = { Port::makeVideo("Value") }; // hidden; mirrors the other sink nodes
+    }
+    void evaluate() override { outputVideo(0, inputVideo(0)); }
+};
+
+// ── VIDEO SWITCHBOX ───────────────────────────────────────────────────────────
+// in[0]=Video On, in[1]=Video Off, in[2]=Switch(bool) → out[0]=Video.
+// Passes the On video through while Switch is on, otherwise the Off one.
+// Type 57 in Stormworks XML (input order mirrors the other switchboxes).
+class VideoSwitchboxNode : public Node {
+public:
+    VideoSwitchboxNode() : Node(NodeType::VideoSwitchbox, "Video Switchbox") {
+        inputs  = { Port::makeVideo("On"), Port::makeVideo("Off"), Port::makeBool("Switch") };
+        outputs = { Port::makeVideo("Out") };
+    }
+    void evaluate() override {
+        outputVideo(0, inputBool(2) ? inputVideo(0) : inputVideo(1));
+    }
+};
+
+// ── AUDIO INPUT (type 8 in components_bridge) ─────────────────────────────────
+// An audio signal coming into the MC; like video, its "value" is its source name.
+class AudioInputNode : public Node {
+public:
+    AudioInputNode() : Node(NodeType::AudioInput, "Audio Input") {
+        outputs = { Port::makeAudio("Out") };
+    }
+    void evaluate() override {
+        outputAudio(0, label.isEmpty() ? QString("Audio In %1").arg(id) : label);
+    }
+};
+
+// ── AUDIO OUTPUT (type 9 in components_bridge) ────────────────────────────────
+// An audio signal leaving the MC. A pure sink; its panel shows the source.
+class AudioOutputNode : public Node {
+public:
+    AudioOutputNode() : Node(NodeType::AudioOutput, "Audio Output") {
+        inputs  = { Port::makeAudio("In") };
+        outputs = { Port::makeAudio("Value") }; // hidden; mirrors the other sink nodes
+    }
+    void evaluate() override { outputAudio(0, inputAudio(0)); }
+};
+
+// ── AUDIO SWITCHBOX ───────────────────────────────────────────────────────────
+// in[0]=Audio On, in[1]=Audio Off, in[2]=Switch(bool) → out[0]=Audio.
+// Type 59 in Stormworks XML (input order mirrors the other switchboxes).
+class AudioSwitchboxNode : public Node {
+public:
+    AudioSwitchboxNode() : Node(NodeType::AudioSwitchbox, "Audio Switchbox") {
+        inputs  = { Port::makeAudio("On"), Port::makeAudio("Off"), Port::makeBool("Switch") };
+        outputs = { Port::makeAudio("Out") };
+    }
+    void evaluate() override {
+        outputAudio(0, inputBool(2) ? inputAudio(0) : inputAudio(1));
+    }
 };
 
 // ── COMPOSITE PACKER ─────────────────────────────────────────────────────────
@@ -76,8 +153,8 @@ public:
         inputs.clear();
         for (int i = 0; i < count; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(i + 1)));
-        outputs = { Port::makeComposite("Composite") };
-        name = QString("Comp. Packer (%1ch)").arg(count);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Packer"; // the Ch1..ChN input labels already show the count
     }
 
     void evaluate() override {
@@ -127,9 +204,9 @@ public:
 class CompositeSwitchboxNode : public Node {
 public:
     CompositeSwitchboxNode() : Node(NodeType::CompositeSwitchbox, "Comp. Switchbox") {
-        inputs  = { Port::makeComposite("Comp. On"), Port::makeComposite("Comp. Off"),
+        inputs  = { Port::makeComposite("On"), Port::makeComposite("Off"),
                     Port::makeBool("Switch") };
-        outputs = { Port::makeComposite("Composite") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override {
         outputComposite(0, inputBool(2) ? inputComposite(0) : inputComposite(1));
@@ -143,8 +220,8 @@ public:
 class BinaryToNumberNode : public Node {
 public:
     BinaryToNumberNode() : Node(NodeType::BinaryToNumber, "Binary to Number") {
-        inputs  = { Port::makeComposite("Composite") };
-        outputs = { Port::makeNumber("Number") };
+        inputs  = { Port::makeComposite("In") };
+        outputs = { Port::makeNumber("Out") };
     }
     void evaluate() override {
         const CompositeData data = inputComposite(0);
@@ -162,8 +239,8 @@ public:
 class NumberToBinaryNode : public Node {
 public:
     NumberToBinaryNode() : Node(NodeType::NumberToBinary, "Number to Binary") {
-        inputs  = { Port::makeNumber("Number") };
-        outputs = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeNumber("In") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override {
         const double v = inputNumber(0);
@@ -187,8 +264,8 @@ public:
     QString script;
 
     LuaScriptNode() : Node(NodeType::LuaScript, "Lua Script") {
-        inputs  = { Port::makeComposite("Composite") };
-        outputs = { Port::makeComposite("Composite") };
+        inputs  = { Port::makeComposite("In") };
+        outputs = { Port::makeComposite("Out") };
     }
     void evaluate() override { outputComposite(0, CompositeData{}); }
 };
@@ -233,11 +310,11 @@ public:
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeComposite("Composite In"));
+        inputs.push_back(Port::makeComposite("In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeNumber(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeComposite("Composite Out") };
-        name = QString("Comp. Write Num (%1ch @%2)").arg(channelCount).arg(startIndex);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Write Num"; // the Ch labels already show the channels
     }
 };
 
@@ -273,10 +350,10 @@ public:
 private:
     void rebuildPorts() {
         inputs.clear();
-        inputs.push_back(Port::makeComposite("Composite In"));
+        inputs.push_back(Port::makeComposite("In"));
         for (int i = 0; i < channelCount; ++i)
             inputs.push_back(Port::makeBool(QString("Ch%1").arg(startIndex + i)));
-        outputs = { Port::makeComposite("Composite Out") };
-        name = QString("Comp. Write Bool (%1ch @%2)").arg(channelCount).arg(startIndex);
+        outputs = { Port::makeComposite("Out") };
+        name = "Comp. Write Bool"; // the Ch labels already show the channels
     }
 };

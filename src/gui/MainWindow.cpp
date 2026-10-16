@@ -50,6 +50,11 @@ MainWindow::MainWindow(QWidget* parent)
         ioPanel_->loadMicrocontroller(mc_.get());
     });
 
+    // ── Renaming a connector only needs the panel's row titles refreshed ──────
+    connect(graphView_, &NodeGraphView::labelsChanged, this, [this]() {
+        ioPanel_->updateLabels();
+    });
+
     // ── Initialize the view with an empty microcontroller so the user can
     // start adding nodes immediately without needing to load a file first ──────
     graphView_->loadMicrocontroller(mc_.get());
@@ -88,6 +93,13 @@ void MainWindow::setupMenuBar()
     QAction* quitAct = fileMenu->addAction("&Quit");
     quitAct->setShortcut(QKeySequence::Quit);
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
+
+    // Add Node menu — the same categorized list as the right-click "Add Node".
+    // New nodes appear in the middle of the visible area.
+    QMenu* addNodeMenu = menuBar()->addMenu("&Add Node");
+    graphView_->populateAddNodeMenu(addNodeMenu, [this]() {
+        return graphView_->defaultSpawnPoint();
+    });
 
     // Simulation menu
     QMenu* simMenu = menuBar()->addMenu("&Simulation");

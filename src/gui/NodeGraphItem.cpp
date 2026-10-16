@@ -11,6 +11,7 @@
 #include <QStyleOptionGraphicsItem>
 #include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsSceneHoverEvent>
 #include <QFont>
 #include <QDialog>
 #include <QVBoxLayout>
@@ -39,7 +40,32 @@ NodeGraphItem::NodeGraphItem(Node* node, QGraphicsItem* parent)
     setFlag(QGraphicsItem::ItemIsMovable);
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+    setAcceptHoverEvents(true);
     setPos(node_->posX, node_->posY);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hoverMoveEvent — tooltip with the full label and type of the hovered port
+// ─────────────────────────────────────────────────────────────────────────────
+void NodeGraphItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
+{
+    auto describe = [](const Port& p) {
+        const char* kind = p.type == PortType::Bool      ? "bool"
+                         : p.type == PortType::Composite ? "composite" : "number";
+        return QString("%1 (%2)").arg(p.label, kind);
+    };
+
+    QString tip;
+    const QPointF scenePos = event->scenePos();
+    const int out = outputPortAt(scenePos);
+    if (out >= 0) {
+        tip = describe(node_->outputs[out]);
+    } else {
+        const int in = inputPortAt(scenePos);
+        if (in >= 0) tip = describe(node_->inputs[in]);
+    }
+    setToolTip(tip);
+    QGraphicsItem::hoverMoveEvent(event);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,10 +111,51 @@ qreal NodeGraphItem::outputPortY(int idx) const {
 // ─────────────────────────────────────────────────────────────────────────────
 QRectF NodeGraphItem::innerRect() const
 {
-    return QRectF(kInnerMarginX,
+    qreal left, right;
+    panelMargins(left, right);
+    return QRectF(left,
                   kHeaderH + kInnerMarginY,
-                  kWidth - kInnerMarginX * 2,
+                  kWidth - left - right,
                   totalHeight() - kHeaderH - kInnerMarginY * 2);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// panelMargins — space reserved left and right of the grey panel
+//
+// Normally kInnerMarginX on each side. When a port label is too long to fit in
+// that space, the margin on that side grows to fit it, shrinking the panel —
+// but never below kMinPanelW, beyond which labels are simply shortened.
+// ─────────────────────────────────────────────────────────────────────────────
+void NodeGraphItem::panelMargins(qreal& left, qreal& right) const
+{
+    left  = kInnerMarginX;
+    right = kInnerMarginX;
+
+    // Same size as the 6pt port labels drawn in paint()
+    QFont labelFont;
+    labelFont.setPointSize(6);
+    const QFontMetricsF fm(labelFont);
+
+    if (inputPortsVisible()) {
+        qreal widest = 0.0;
+        for (const Port& p : node_->inputs)
+            widest = std::max(widest, fm.horizontalAdvance(p.label));
+        // ring + gap before the label, then the label, then a little breathing room
+        left = std::max(left, kPortRadius * 2 + 4 + widest + 3);
+    }
+    if (outputPortsVisible()) {
+        qreal widest = 0.0;
+        for (const Port& p : node_->outputs)
+            widest = std::max(widest, fm.horizontalAdvance(p.label));
+        right = std::max(right, widest + kPortRadius * 2 + 4 + 3);
+    }
+
+    // Keep a usable panel: take back the excess evenly and let labels elide
+    const qreal excess = kMinPanelW - (kWidth - left - right);
+    if (excess > 0.0) {
+        left  -= excess / 2.0;
+        right -= excess / 2.0;
+    }
 }
 
 QPointF NodeGraphItem::inputPortLocalPos(int idx) const
@@ -140,6 +207,10 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::NumberOutput:
         case NodeType::CompositeInput:
         case NodeType::CompositeOutput:
+        case NodeType::VideoInput:
+        case NodeType::VideoOutput:
+        case NodeType::AudioInput:
+        case NodeType::AudioOutput:
         case NodeType::Capacitor:
         case NodeType::LuaScript:
         case NodeType::Blinker:
@@ -197,6 +268,175 @@ QColor NodeGraphItem::headerColor() const
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// iconGlyph — short symbol drawn in the node's grey icon square
+//
+// Stormworks draws a picture here; we use a compact text glyph per node type,
+// falling back to the first letters of the node's name.
+// ─────────────────────────────────────────────────────────────────────────────
+QString NodeGraphItem::iconGlyph(NodeType type, const QString& name)
+{
+    switch (type) {
+        // I/O bridge
+        case NodeType::BoolInput:
+        case NodeType::NumberInput:
+        case NodeType::CompositeInput:
+        case NodeType::VideoInput:
+        case NodeType::AudioInput:           return "In";
+        case NodeType::VideoSwitchbox:       return "VSw";
+        case NodeType::AudioSwitchbox:       return "ASw";
+        case NodeType::BoolOutput:
+        case NodeType::NumberOutput:
+        case NodeType::CompositeOutput:
+        case NodeType::VideoOutput:
+        case NodeType::AudioOutput:          return "Out";
+
+        // Logic
+        case NodeType::And:                  return "&";
+        case NodeType::Or:                   return "≥" "1";   // ≥1
+        case NodeType::Not:                  return "¬";       // ¬
+        case NodeType::Xor:                  return "=1";
+        case NodeType::Nand:                 return "!&";
+        case NodeType::Nor:                  return "!≥";      // !≥
+        case NodeType::ConstantOn:           return "ON";
+        case NodeType::SRLatch:              return "SR";
+        case NodeType::JKFlipFlop:           return "JK";
+        case NodeType::Capacitor:            return "Cap";
+        case NodeType::PushToToggle:         return "P/T";
+        case NodeType::ToggleToPush:         return "T/P";
+
+        // Math
+        case NodeType::Add:                  return "+";
+        case NodeType::Subtract:             return "−";       // −
+        case NodeType::Multiply:             return "×";       // ×
+        case NodeType::Divide:               return "÷";       // ÷
+        case NodeType::Modulo:               return "%";
+        case NodeType::Abs:                  return "|x|";
+        case NodeType::Clamp:                return "[ ]";
+        case NodeType::Delta:                return "Δ";       // Δ
+        case NodeType::EqualTo:              return "=";
+        case NodeType::GreaterThan:          return ">";
+        case NodeType::LessThan:             return "<";
+        case NodeType::Threshold:            return "<x<";
+        case NodeType::NumberLiteral:        return "#";
+        case NodeType::NumericalSwitchbox:   return "⇄";       // ⇄
+        case NodeType::NumericalJunction:    return "Jn";
+
+        // Function
+        case NodeType::Function1:
+        case NodeType::Function3:
+        case NodeType::Function8:
+        case NodeType::FunctionBool4:
+        case NodeType::FunctionBool8:        return "fx";
+
+        // Stateful
+        case NodeType::UpDownCounter:        return "↕";       // ↕
+        case NodeType::MemoryRegister:       return "Mem";
+        case NodeType::Blinker:              return "Bl";
+        case NodeType::TimerTON:             return "TON";
+        case NodeType::TimerTOF:             return "TOF";
+        case NodeType::TimerRTO:             return "RTO";
+        case NodeType::TimerRTF:             return "RTF";
+        case NodeType::PIDController:
+        case NodeType::PIDControllerAdvanced: return "PID";
+
+        // Composite
+        case NodeType::CompositePacker:      return "Pk";
+        case NodeType::CompositeReadNumber:  return "R#";
+        case NodeType::CompositeReadBool:    return "R?";
+        case NodeType::CompositeWriteNumber: return "W#";
+        case NodeType::CompositeWriteBool:   return "W?";
+        case NodeType::CompositeSwitchbox:   return "⇄";       // ⇄
+        case NodeType::BinaryToNumber:       return "B>N";
+        case NodeType::NumberToBinary:       return "N>B";
+        case NodeType::LuaScript:            return "Lua";
+
+        // Property / tooltip
+        case NodeType::PropertyDropdown:     return "▾";       // ▾
+        case NodeType::PropertyNumber:       return "P#";
+        case NodeType::PropertySlider:       return "Sl";
+        case NodeType::PropertyToggle:       return "Tg";
+        case NodeType::PropertyText:         return "Aa";
+        case NodeType::TooltipNumber:        return "i#";
+        case NodeType::TooltipOnOff:         return "i?";
+
+        default: break;
+    }
+    return name.left(2).toUpper();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// equation — the live one-line equation a math node shows in its grey panel
+//
+// The equation is a list of segments drawn left to right on one line. Values
+// (numbers and ON/OFF) are bold segments; operators and words are plain ones.
+// `valid` is false for nodes that don't show an equation. Values are the ones
+// the node saw on its latest tick.
+// ─────────────────────────────────────────────────────────────────────────────
+struct EqSeg {
+    QString text;
+    bool    bold;
+};
+
+struct Equation {
+    std::vector<EqSeg> segs;
+    bool               valid = false;
+};
+
+static Equation equation(const Node* n)
+{
+    auto num   = [](double v)  { return QString::number(v, 'g', 5); };
+    auto onoff = [](bool b)    { return QString(b ? "ON" : "OFF"); };
+    auto T     = [](const QString& s) { return EqSeg{ s, false }; }; // operator / word
+    auto V     = [](const QString& s) { return EqSeg{ s, true  }; }; // value
+    auto in    = [&](int i)    { return V(num(n->inputs[i].asNumber())); };
+    auto out0  = [&]()         { return V(num(n->outputs[0].asNumber())); };
+    auto flag0 = [&]()         { return V(onoff(n->outputs[0].asBool())); };
+    auto make  = [](std::vector<EqSeg> segs) { return Equation{ std::move(segs), true }; };
+    auto binary = [&](const QString& op) {
+        return make({ in(0), T(" " + op + " "), in(1), T(" = "), out0() });
+    };
+
+    switch (n->type) {
+        case NodeType::Add:      return binary("+");
+        case NodeType::Subtract: return binary("−");   // −
+        case NodeType::Multiply: return binary("×");   // ×
+        case NodeType::Modulo:   return binary("%");
+        case NodeType::Divide: {
+            const bool err = n->outputs.size() > 1 && n->outputs[1].asBool();
+            return make({ in(0), T(" ÷ "), in(1), T(" = "), err ? V("0!") : out0() });
+        }
+        case NodeType::Abs:
+            return make({ T("|"), in(0), T("| = "), out0() });
+        case NodeType::Clamp: {
+            const auto* c = static_cast<const ClampNode*>(n);
+            return make({ T("clamp("), in(0), T(", "), V(num(c->minBound)), T(", "),
+                          V(num(c->maxBound)), T(") = "), out0() });
+        }
+        case NodeType::Delta:
+            return make({ T("Δ("), in(0), T(") = "), out0() });
+        case NodeType::GreaterThan:
+            return make({ in(0), T(" > "), in(1), T(" → "), flag0() });
+        case NodeType::LessThan:
+            return make({ in(0), T(" < "), in(1), T(" → "), flag0() });
+        case NodeType::EqualTo:
+            return make({ in(0), T(" ≈ "), in(1), T(" → "), flag0() });
+        case NodeType::Threshold: {
+            const auto* t = static_cast<const ThresholdNode*>(n);
+            return make({ V(num(t->minBound)), T(" ≤ "), in(0), T(" ≤ "),
+                          V(num(t->maxBound)), T(" → "), flag0() });
+        }
+        case NodeType::NumericalSwitchbox:
+            return make({ V(onoff(n->inputs[2].asBool())), T(" ? "), in(0), T(" : "), in(1),
+                          T(" = "), out0() });
+        case NodeType::NumericalJunction:
+            // "5 → On" / "5 → Off": which path the value is being sent down
+            return make({ in(0), T(" → "), V(n->inputs[1].asBool() ? "On" : "Off") });
+        default:
+            return {};
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // paint
 // ─────────────────────────────────────────────────────────────────────────────
 void NodeGraphItem::paint(QPainter* painter,
@@ -220,23 +460,10 @@ void NodeGraphItem::paint(QPainter* painter,
     const bool gameStyle = (node_->type == NodeType::SRLatch ||
                             node_->type == NodeType::JKFlipFlop);
 
-    // ── Header ────────────────────────────────────────────────────────────────
-    // Clipped to the rounded body so the header follows the top corners
+    // The top strip (kHeaderH tall) holds the node's icon and title; there is no
+    // separate header fill, as in the game.
     QRectF headerRect(0, 0, kWidth, kHeaderH);
-    if (!gameStyle) {
-        painter->save();
-        QPainterPath bodyPath;
-        bodyPath.addRoundedRect(bounds, kCornerR, kCornerR);
-        painter->setClipPath(bodyPath);
-        painter->setBrush(QColor(0xdc, 0xdc, 0xdc));
-        painter->drawRect(headerRect);
-        painter->restore();
 
-        painter->setPen(QColor(0x9a, 0x9a, 0x9a));
-        painter->drawLine(0, kHeaderH, kWidth, kHeaderH);
-    }
-
-    // Outline last so the header fill doesn't cover it
     painter->setPen(outlinePen);
     painter->setBrush(Qt::NoBrush);
     painter->drawRoundedRect(bounds, kCornerR, kCornerR);
@@ -258,7 +485,7 @@ void NodeGraphItem::paint(QPainter* painter,
 
         // Small title beside the icon ("JK Flip-Flop" -> "JK Flip Flop")
         QFont titleFont = painter->font();
-        titleFont.setBold(false);
+        titleFont.setBold(true);
         titleFont.setPointSize(7);
         painter->setFont(titleFont);
         painter->setPen(QColor(0x33, 0x33, 0x33));
@@ -267,6 +494,11 @@ void NodeGraphItem::paint(QPainter* painter,
         painter->drawText(QRectF(icon.right() + 5, icon.top(), kWidth - icon.right() - 10,
                                  icon.height()),
                           Qt::AlignVCenter | Qt::AlignLeft, title);
+
+        // Port labels stay regular weight (only the title is bold)
+        QFont labelFont = titleFont;
+        labelFont.setBold(false);
+        painter->setFont(labelFont);
 
         // Ports — inputs are rings on the left edge, outputs filled discs on the
         // right edge, all bool (red), each with its label. No state panel.
@@ -298,17 +530,36 @@ void NodeGraphItem::paint(QPainter* painter,
         return;
     }
 
-    // Header text — leave room for gear button if this node has settings
-    QFont headerFont = painter->font();
-    headerFont.setBold(true);
-    headerFont.setPointSize(8);
-    painter->setFont(headerFont);
-    painter->setPen(QColor(0x33, 0x33, 0x33));
-    QRectF textRect = headerRect.adjusted(4, 0, hasSettings() ? -kGearSize - 4 : -4, 0);
-    painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
-                      painter->fontMetrics().elidedText(
-                          node_->label.isEmpty() ? node_->name : node_->label,
-                          Qt::ElideRight, (int)textRect.width()));
+    // ── Icon and title (Stormworks style) ─────────────────────────────────────
+    // A small grey rounded square with a short glyph, then the node's title in
+    // small text. Leaves room for the ⚙ button if this node has settings.
+    {
+        const QRectF icon(8, (kHeaderH - 20) / 2.0, 20, 20);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(0x80, 0x80, 0x80));
+        painter->drawRoundedRect(icon, 2, 2);
+
+        const QString glyph = iconGlyph(node_->type, node_->name);
+        QFont iconFont = painter->font();
+        iconFont.setBold(true);
+        iconFont.setPointSize(glyph.size() <= 1 ? 9 : glyph.size() == 2 ? 8 : 6);
+        painter->setFont(iconFont);
+        painter->setPen(Qt::white);
+        painter->drawText(icon, Qt::AlignCenter, glyph);
+
+        QFont titleFont = painter->font();
+        titleFont.setBold(true);
+        titleFont.setPointSize(7);
+        painter->setFont(titleFont);
+        painter->setPen(QColor(0x33, 0x33, 0x33));
+        const QRectF titleRect(icon.right() + 6, 0,
+                               kWidth - icon.right() - 6 - (hasSettings() ? kGearSize + 8 : 6),
+                               kHeaderH);
+        painter->drawText(titleRect, Qt::AlignVCenter | Qt::AlignLeft,
+                          painter->fontMetrics().elidedText(
+                              node_->label.isEmpty() ? node_->name : node_->label,
+                              Qt::ElideRight, (int)titleRect.width()));
+    }
 
     // ── Settings gear button ──────────────────────────────────────────────────
     if (hasSettings()) {
@@ -327,13 +578,15 @@ void NodeGraphItem::paint(QPainter* painter,
     // ── Port rows ─────────────────────────────────────────────────────────────
     QFont portFont = painter->font();
     portFont.setBold(false);
-    portFont.setPointSize(7);
+    portFont.setPointSize(6); // small: only ~20px beside the panel on a 4-cell node
     painter->setFont(portFont);
 
     // Determine if this node is a pure source (no inputs shown) or pure sink (no outputs shown)
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
+                         node_->type == NodeType::VideoInput ||
+                         node_->type == NodeType::AudioInput ||
                          node_->type == NodeType::NumberLiteral ||
                          node_->type == NodeType::PropertyDropdown ||
                          node_->type == NodeType::PropertyNumber ||
@@ -341,12 +594,16 @@ void NodeGraphItem::paint(QPainter* painter,
                          node_->type == NodeType::PropertyToggle);
     bool isSinkNode  = (node_->type == NodeType::BoolOutput  ||
                          node_->type == NodeType::NumberOutput ||
-                         node_->type == NodeType::CompositeOutput);
+                         node_->type == NodeType::CompositeOutput ||
+                         node_->type == NodeType::VideoOutput ||
+                         node_->type == NodeType::AudioOutput);
 
     // Helper: get port color based on type, port index, and direction.
     auto portColor = [](const Port& p, bool /*isOutput*/, int /*portIdx*/) -> QColor {
         switch (p.type) {
             case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple
+            case PortType::Video:     return QColor(0x00, 0xe6, 0xb4); // aqua
+            case PortType::Audio:     return QColor(0x86, 0x9c, 0x00); // olive
             case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red
             default:                  return QColor(0x00, 0xe0, 0x50); // green
         }
@@ -384,11 +641,17 @@ void NodeGraphItem::paint(QPainter* painter,
                         node_->type == NodeType::Nand ||
                         node_->type == NodeType::Nor);
 
+    // Math nodes show their equation instead of separate input/output values
+    const Equation eq           = equation(node_);
+    const bool     showEquation = eq.valid;
+
     // ── Input circles (left side of inner rect) ───────────────────────────────
     // For logic gates these connect via lines to the gate body
-    for (int i = 0; i < (int)node_->inputs.size(); ++i) {
+    for (int i = 0; i < (int)node_->inputs.size() && !showEquation; ++i) {
         const Port& p  = node_->inputs[i];
-        if (p.type == PortType::Composite) continue; // no single value to show
+        if (p.type == PortType::Composite || p.type == PortType::Video ||
+            p.type == PortType::Audio)
+            continue; // no single value to show
         // These are display-only state indicators — the real input ports are the
         // rings on the node's left edge. Source/sink nodes show one centred
         // indicator (circle or value).
@@ -417,6 +680,66 @@ void NodeGraphItem::paint(QPainter* painter,
         }
     }
 
+    // ── One-line equation for math nodes ──────────────────────────────────────
+    // Segments are laid out left to right and centred in the panel. Values are
+    // bold white, operators and words plain and a little dimmer. The font shrinks
+    // until the whole line fits the panel width.
+    if (showEquation) {
+        const qreal maxW = innerRect.width() - 6;
+
+        QFont plainFont = painter->font();
+        plainFont.setBold(false);
+        QFont boldFont = plainFont;
+        boldFont.setBold(true);
+
+        auto totalWidth = [&](qreal size) {
+            plainFont.setPointSizeF(size);
+            boldFont.setPointSizeF(size);
+            const QFontMetricsF plain(plainFont), bold(boldFont);
+            qreal w = 0.0;
+            for (const EqSeg& s : eq.segs)
+                w += (s.bold ? bold : plain).horizontalAdvance(s.text);
+            return w;
+        };
+
+        qreal size = 7.0;
+        qreal width = totalWidth(size);
+        while (width > maxW && size > 4.0) {
+            size -= 0.5;
+            width = totalWidth(size);
+        }
+
+        const QFontMetricsF plain(plainFont), bold(boldFont);
+        const qreal h = bold.height();
+        const qreal y = innerRect.center().y() - h * 0.5;
+        qreal x = innerRect.center().x() - width * 0.5;
+
+        for (const EqSeg& s : eq.segs) {
+            const QFontMetricsF& fm = s.bold ? bold : plain;
+            const qreal w = fm.horizontalAdvance(s.text);
+            painter->setFont(s.bold ? boldFont : plainFont);
+            painter->setPen(s.bold ? QColor(Qt::white) : QColor(0xdd, 0xdd, 0xdd));
+            painter->drawText(QRectF(x, y, w + 2, h), Qt::AlignVCenter | Qt::AlignLeft, s.text);
+            x += w;
+        }
+    }
+
+    // ── Video / Audio Output: show which source is feeding it ─────────────────
+    // (The simulator has no pictures or sound; the signal is just its source's name.)
+    if (node_->type == NodeType::VideoOutput || node_->type == NodeType::AudioOutput) {
+        QFont srcFont = painter->font();
+        srcFont.setPointSize(6);
+        painter->setFont(srcFont);
+        const QString source = node_->inputs[0].asVideo();
+        painter->setPen(QColor(0xdd, 0xdd, 0xdd));
+        painter->drawText(innerRect.adjusted(3, 0, -3, 0),
+                          Qt::AlignCenter | Qt::TextWordWrap,
+                          source.isEmpty() ? QString("no signal")
+                                           : painter->fontMetrics().elidedText(
+                                                 source, Qt::ElideMiddle,
+                                                 (int)innerRect.width() * 2 - 12));
+    }
+
     // ── Constant Number: show the configured value in the grey panel ──────────
     if (node_->type == NodeType::NumberLiteral) {
         auto* lit = static_cast<NumberLiteralNode*>(node_);
@@ -427,7 +750,7 @@ void NodeGraphItem::paint(QPainter* painter,
 
     // ── Property nodes: property name above the current value ─────────────────
     // The name is shown smaller and dimmer on the top line; the value (or
-    // ON/OFF for a toggle) sits below it. Property Text has only a name.
+    // ON/OFF for a toggle, the text for Property Text) sits below it.
     {
         QString name, value;
         bool    isProperty = true;
@@ -456,9 +779,12 @@ void NodeGraphItem::paint(QPainter* painter,
                 value = pt->value ? "ON" : "OFF";
                 break;
             }
-            case NodeType::PropertyText:
-                name = static_cast<PropertyTextNode*>(node_)->propertyName;
+            case NodeType::PropertyText: {
+                auto* pt = static_cast<PropertyTextNode*>(node_);
+                name  = pt->propertyName;
+                value = pt->text;   // empty text shows the name alone
                 break;
+            }
             default:
                 isProperty = false;
                 break;
@@ -489,9 +815,12 @@ void NodeGraphItem::paint(QPainter* painter,
 
     // ── Output circles (right side of inner rect) ─────────────────────────────
     // Source/sink nodes already show their value above, so skip the duplicate.
-    for (int i = 0; i < (int)node_->outputs.size() && !isSourceNode && !isSinkNode; ++i) {
+    for (int i = 0; i < (int)node_->outputs.size() && !isSourceNode && !isSinkNode
+                    && !showEquation; ++i) {
         const Port& p  = node_->outputs[i];
-        if (p.type == PortType::Composite) continue; // no single value to show
+        if (p.type == PortType::Composite || p.type == PortType::Video ||
+            p.type == PortType::Audio)
+            continue; // no single value to show
         // For logic gates, always center the single output circle vertically
         qreal cy = isLogicGate ? innerRect.center().y()
                                : innerRect.top() + i * rowH + rowH * 0.5;
@@ -664,6 +993,10 @@ void NodeGraphItem::paint(QPainter* painter,
     }
 
     // ── Port labels and edge connection circles ───────────────────────────────
+    // Panel drawing above (equations, values) leaves other fonts selected; labels
+    // are always small and regular weight.
+    painter->setFont(portFont);
+
     // Input ports (left edge) — rings, hidden on pure source nodes
     if (!isSourceNode) {
         for (int i = 0; i < (int)node_->inputs.size(); ++i) {
@@ -678,8 +1011,10 @@ void NodeGraphItem::paint(QPainter* painter,
 
             painter->setPen(QColor(0x33, 0x33, 0x33));
             QRectF labelRect(labelX, cy - kPortRowH * 0.5,
-                             kInnerMarginX - labelX - 2, kPortRowH);
-            painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft, p.label);
+                             innerRect.left() - labelX - 2, kPortRowH);
+            painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft,
+                              painter->fontMetrics().elidedText(p.label, Qt::ElideRight,
+                                                                (int)labelRect.width()));
         }
     }
 
@@ -696,9 +1031,11 @@ void NodeGraphItem::paint(QPainter* painter,
 
             // Label only — no value text (value is shown in inner rect)
             painter->setPen(QColor(0x33, 0x33, 0x33));
-            QRectF labelRect(kWidth * 0.68 + 4, cy - kPortRowH * 0.5,
-                             kWidth * 0.32 - kPortRadius * 2 - 6, kPortRowH);
-            painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft, p.label);
+            QRectF labelRect(innerRect.right() + 2, cy - kPortRowH * 0.5,
+                             kWidth - innerRect.right() - kPortRadius * 2 - 4, kPortRowH);
+            painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignRight,
+                              painter->fontMetrics().elidedText(p.label, Qt::ElideRight,
+                                                                (int)labelRect.width()));
         }
     }
 }
@@ -725,6 +1062,8 @@ bool NodeGraphItem::inputPortsVisible() const
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
+                         node_->type == NodeType::VideoInput ||
+                         node_->type == NodeType::AudioInput ||
                          node_->type == NodeType::NumberLiteral ||
                          node_->type == NodeType::PropertyDropdown ||
                          node_->type == NodeType::PropertyNumber ||
@@ -737,7 +1076,9 @@ bool NodeGraphItem::outputPortsVisible() const
 {
     bool isSinkNode = (node_->type == NodeType::BoolOutput  ||
                        node_->type == NodeType::NumberOutput ||
-                       node_->type == NodeType::CompositeOutput);
+                       node_->type == NodeType::CompositeOutput ||
+                       node_->type == NodeType::VideoOutput ||
+                       node_->type == NodeType::AudioOutput);
     return !isSinkNode;
 }
 
@@ -797,6 +1138,8 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
 
     switch (p.type) {
         case PortType::Composite: return QColor(0x80, 0x00, 0xff); // purple — composite wire
+        case PortType::Video:     return QColor(0x00, 0xe6, 0xb4); // aqua — video wire
+        case PortType::Audio:     return QColor(0x86, 0x9c, 0x00); // olive — audio wire
         case PortType::Bool:      return QColor(0xf0, 0x10, 0x50); // red — bool
         default:                  return QColor(0x00, 0xe0, 0x50); // green — number
     }
@@ -808,6 +1151,16 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
 QVariant NodeGraphItem::itemChange(GraphicsItemChange change,
                                    const QVariant& value)
 {
+    // Keep the whole node on the board (the scene rect), so it can't be dragged
+    // or placed past the edge of the work area
+    if (change == ItemPositionChange && scene()) {
+        const QRectF board = scene()->sceneRect();
+        QPointF p = value.toPointF();
+        p.setX(std::clamp(p.x(), board.left(), std::max(board.left(), board.right()  - kWidth)));
+        p.setY(std::clamp(p.y(), board.top(),  std::max(board.top(),  board.bottom() - totalHeight())));
+        return p;
+    }
+
     if (change == ItemPositionHasChanged && node_) {
         QPointF p = value.toPointF();
         node_->posX = (int)p.x();
@@ -1176,6 +1529,14 @@ void NodeGraphItem::openSettingsDialog()
         auto* dd = static_cast<PropertyDropdownNode*>(node_);
         dialog.setMinimumWidth(420);
 
+        // The app-wide dark stylesheet leaves a checked radio button's dot the same
+        // colour as its background, so the selected option looked missing.
+        dialog.setStyleSheet(dialog.styleSheet() +
+            "QRadioButton::indicator { width: 12px; height: 12px; border-radius: 8px;"
+            "  border: 2px solid #888; background: #1e1e1e; }"
+            "QRadioButton::indicator:hover { border-color: #ccc; }"
+            "QRadioButton::indicator:checked { border: 2px solid #00dd44; background: #00dd44; }");
+
         layout->addWidget(new QLabel("Property Name:"));
         auto* nameEdit = new QLineEdit(dd->propertyName);
         layout->addWidget(nameEdit);
@@ -1208,7 +1569,7 @@ void NodeGraphItem::openSettingsDialog()
             valueSpin->setRange(-1e9, 1e9);
             valueSpin->setDecimals(4);
             valueSpin->setValue(value);
-            auto* removeBtn = new QPushButton("✕");
+            auto* removeBtn = new QPushButton("×"); // plain × — ✕ isn't in the UI font
             removeBtn->setFixedWidth(28);
 
             rowLayout->addWidget(radio);
@@ -1326,13 +1687,18 @@ void NodeGraphItem::openSettingsDialog()
     else if (node_->type == NodeType::PropertyText) {
         auto* pt = static_cast<PropertyTextNode*>(node_);
         layout->addWidget(new QLabel("Property Name:"));
-        auto* textEdit = new QLineEdit(pt->propertyName);
+        auto* nameEdit = new QLineEdit(pt->propertyName);
+        layout->addWidget(nameEdit);
+
+        layout->addWidget(new QLabel("Text:"));
+        auto* textEdit = new QLineEdit(pt->text);
         layout->addWidget(textEdit);
 
         auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
         layout->addWidget(buttons);
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
-            pt->propertyName = textEdit->text();
+            pt->propertyName = nameEdit->text();
+            pt->text         = textEdit->text();
             update();
             dialog.accept();
         });
@@ -1380,7 +1746,9 @@ void NodeGraphItem::openSettingsDialog()
     // The name Stormworks shows for this input/output on the microcontroller.
     else if (node_->type == NodeType::BoolInput  || node_->type == NodeType::BoolOutput ||
              node_->type == NodeType::NumberInput || node_->type == NodeType::NumberOutput ||
-             node_->type == NodeType::CompositeInput || node_->type == NodeType::CompositeOutput) {
+             node_->type == NodeType::CompositeInput || node_->type == NodeType::CompositeOutput ||
+             node_->type == NodeType::VideoInput || node_->type == NodeType::VideoOutput ||
+             node_->type == NodeType::AudioInput || node_->type == NodeType::AudioOutput) {
         layout->addWidget(new QLabel("Label (shown in Stormworks):"));
         auto* labelEdit = new QLineEdit(node_->label);
         labelEdit->setPlaceholderText(node_->name);
@@ -1392,6 +1760,7 @@ void NodeGraphItem::openSettingsDialog()
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
             node_->label = labelEdit->text().trimmed();
             update();
+            if (onLabelChanged) onLabelChanged();
             dialog.accept();
         });
         QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);

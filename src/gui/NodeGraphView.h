@@ -3,9 +3,13 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPathItem>
+#include <QMenu>
+#include <QPointF>
+#include <functional>
 #include <unordered_map>
 
 #include "../core/Microcontroller.h"
+class NodePalette;
 #include "NodeGraphItem.h"
 #include "ConnectionItem.h"
 
@@ -50,6 +54,18 @@ public:
     void refreshNodes();
     void clearGraph();
 
+    // Fills a menu with the categorized list of node types. Choosing one adds
+    // that node at the scene position `spawnPos()` returns when it is clicked.
+    // Used by both the right-click menu and the menu bar's "Add Node" menu.
+    void populateAddNodeMenu(QMenu* menu, std::function<QPointF()> spawnPos);
+
+    // A good place to put a node added from the menu bar: the middle of the
+    // visible area, grid-snapped, nudged to a free spot if it's occupied.
+    QPointF defaultSpawnPoint() const;
+
+    // Opens the Tab palette (or closes it if open)
+    void togglePalette();
+
     // ── Grid sizing ────────────────────────────────────────────────────────────
     // Fixed 40x40 square cells. Node footprints are now multiples of this:
     // a single-port I/O node is 4 cells wide x 2 cells tall, growing taller
@@ -57,12 +73,32 @@ public:
     static constexpr int kGridCellW = NodeGraphItem::kGridCell;
     static constexpr int kGridCellH = NodeGraphItem::kGridCell;
 
+    // ── Board size ─────────────────────────────────────────────────────────────
+    // Like the Stormworks editor, the work area is a fixed-size board: the grid
+    // stops at its edge, nodes can't be dragged off it, and zoom/pan are limited
+    // to it. Sizes are in grid cells; the board is placed so the area where
+    // loaded files put their nodes sits near the middle.
+    static constexpr int kBoardLeftCells = -32;
+    static constexpr int kBoardTopCells  = -20;
+    static constexpr int kBoardWCells    = 80;
+    static constexpr int kBoardHCells    = 48;
+    static QRectF boardRect() {
+        return QRectF(kBoardLeftCells * kGridCellW, kBoardTopCells * kGridCellH,
+                      kBoardWCells * kGridCellW,    kBoardHCells * kGridCellH);
+    }
+
 signals:
     // Emitted whenever a node is added or removed, so MainWindow can tell
     // IOPanel to rebuild its input/output controls.
     void nodeSetChanged();
 
+    // Emitted when a node's connector label is edited, so MainWindow can refresh
+    // the I/O panel's row titles without rebuilding it
+    void labelsChanged();
+
 protected:
+    void resizeEvent      (QResizeEvent* event) override;
+    void enterEvent       (QEnterEvent*  event) override;
     void wheelEvent       (QWheelEvent*  event) override;
     void mousePressEvent  (QMouseEvent*  event) override;
     void mouseMoveEvent   (QMouseEvent*  event) override;
@@ -75,6 +111,14 @@ protected:
 private:
     QGraphicsScene*  scene_;
     Microcontroller* mc_ = nullptr; // non-owning, set by loadMicrocontroller
+
+    // Tab palette of node tiles, shown over the view; nodes it adds go at
+    // paletteSpawn_ (where the mouse was when it opened)
+    NodePalette* palette_ = nullptr;
+    QPointF      paletteSpawn_;
+
+    void    positionPalette();
+    QPointF freeSpotNear(QPointF spot) const;
 
     // Maps node id → its visual item so we can look up endpoints for wires
     std::unordered_map<int, NodeGraphItem*> nodeItems_;
