@@ -36,14 +36,17 @@ enum class NodeType {
     NumberInput,
     NumberOutput,
     NumberLiteral,
+    PropertyDropdown,
 
     // Composite
     CompositeInput,
+    CompositeOutput,
     CompositePacker,
     CompositeReadNumber,
     CompositeReadBool,
     CompositeWriteNumber,
     CompositeWriteBool,
+    CompositeSwitchbox,
 
     // Logic
     And,
@@ -52,6 +55,12 @@ enum class NodeType {
     Xor,
     Nand,
     Nor,
+    ConstantOn,
+    PushToToggle,
+    ToggleToPush,
+    SRLatch,
+    JKFlipFlop,
+    Capacitor,
 
     // Math
     Add,
@@ -61,6 +70,9 @@ enum class NodeType {
     Clamp,
     Abs,
     Modulo,
+    Delta,
+    Threshold,
+    NumericalSwitchbox,
 
     // Comparison
     GreaterThan,

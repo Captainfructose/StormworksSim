@@ -18,7 +18,7 @@ NodeGraphView::NodeGraphView(QWidget* parent)
     scene_ = new QGraphicsScene(this);
     setScene(scene_);
 
-    setBackgroundBrush(QColor(0x1a, 0x1a, 0x1a));
+    setBackgroundBrush(QColor(0x62, 0xb6, 0xc9)); // Stormworks teal
     setRenderHint(QPainter::Antialiasing);
     setDragMode(QGraphicsView::NoDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
@@ -37,7 +37,7 @@ void NodeGraphView::drawBackground(QPainter* painter, const QRectF& rect)
 {
     QGraphicsView::drawBackground(painter, rect);
 
-    QPen gridPen(QColor(0x2a, 0x2a, 0x2a));
+    QPen gridPen(QColor(0x46, 0x8c, 0xa0)); // darker teal, as in Stormworks
     gridPen.setWidth(0); // cosmetic, always 1px regardless of zoom
     painter->setPen(gridPen);
 
@@ -344,15 +344,16 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(ioMenu, "Bool Output",     NodeType::BoolOutput);
     addEntry(ioMenu, "Number Input",    NodeType::NumberInput);
     addEntry(ioMenu, "Number Output",   NodeType::NumberOutput);
-    addEntry(ioMenu, "Number Literal",  NodeType::NumberLiteral);
 
     QMenu* compositeMenu = addMenu->addMenu("Composite");
     addEntry(compositeMenu, "Composite Input",       NodeType::CompositeInput);
+    addEntry(compositeMenu, "Composite Output",      NodeType::CompositeOutput);
     addEntry(compositeMenu, "Composite Packer",      NodeType::CompositePacker);
     addEntry(compositeMenu, "Composite Read Number", NodeType::CompositeReadNumber);
     addEntry(compositeMenu, "Composite Read Bool",   NodeType::CompositeReadBool);
     addEntry(compositeMenu, "Composite Write Number", NodeType::CompositeWriteNumber);
     addEntry(compositeMenu, "Composite Write Bool",   NodeType::CompositeWriteBool);
+    addEntry(compositeMenu, "Composite Switchbox",    NodeType::CompositeSwitchbox);
 
     QMenu* logicMenu = addMenu->addMenu("Logic");
     addEntry(logicMenu, "AND",  NodeType::And);
@@ -361,6 +362,12 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(logicMenu, "XOR",  NodeType::Xor);
     addEntry(logicMenu, "NAND", NodeType::Nand);
     addEntry(logicMenu, "NOR",  NodeType::Nor);
+    addEntry(logicMenu, "Constant On", NodeType::ConstantOn);
+    addEntry(logicMenu, "SR Latch",     NodeType::SRLatch);
+    addEntry(logicMenu, "JK Flip-Flop", NodeType::JKFlipFlop);
+    addEntry(logicMenu, "Capacitor",    NodeType::Capacitor);
+    addEntry(logicMenu, "Push to Toggle", NodeType::PushToToggle);
+    addEntry(logicMenu, "Toggle to Push", NodeType::ToggleToPush);
 
     QMenu* mathMenu = addMenu->addMenu("Math");
     addEntry(mathMenu, "Add",          NodeType::Add);
@@ -370,12 +377,17 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(mathMenu, "Clamp",        NodeType::Clamp);
     addEntry(mathMenu, "Abs",          NodeType::Abs);
     addEntry(mathMenu, "Modulo",       NodeType::Modulo);
+    addEntry(mathMenu, "Delta",        NodeType::Delta);
+    addEntry(mathMenu, "Threshold",    NodeType::Threshold);
+    addEntry(mathMenu, "Switchbox",    NodeType::NumericalSwitchbox);
+    addEntry(mathMenu, "Constant Number", NodeType::NumberLiteral);
     addEntry(mathMenu, "Greater Than", NodeType::GreaterThan);
     addEntry(mathMenu, "Less Than",    NodeType::LessThan);
     addEntry(mathMenu, "Equal To",     NodeType::EqualTo);
 
     QMenu* statefulMenu = addMenu->addMenu("Stateful");
     addEntry(statefulMenu, "Up/Down Counter",     NodeType::UpDownCounter);
+    addEntry(statefulMenu, "Memory Register",     NodeType::MemoryRegister);
     statefulMenu->addSeparator();
     addEntry(statefulMenu, "TON Timer",           NodeType::TimerTON);
     addEntry(statefulMenu, "TOF Timer",           NodeType::TimerTOF);
@@ -384,6 +396,9 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     statefulMenu->addSeparator();
     addEntry(statefulMenu, "PID Controller",      NodeType::PIDController);
     addEntry(statefulMenu, "PID Advanced",        NodeType::PIDControllerAdvanced);
+
+    QMenu* propertyMenu = addMenu->addMenu("Property");
+    addEntry(propertyMenu, "Dropdown", NodeType::PropertyDropdown);
 
     QMenu* funcMenu = addMenu->addMenu("Function");
     addEntry(funcMenu, "Function (1 input)",      NodeType::Function1);
@@ -535,9 +550,10 @@ void NodeGraphView::mouseReleaseEvent(QMouseEvent* event)
                     event->accept();
                     return;
                 }
-                event->accept();
-                return;
             }
+            // Dropped on an incompatible port (e.g. number -> bool) or on an
+            // output: reject the connection and cancel the drag.
+            endDrag();
             event->accept();
             return;
         }

@@ -63,6 +63,39 @@ private:
     double stored_ = 0.0;
 };
 
+// ── CAPACITOR ─────────────────────────────────────────────────────────────────
+// in[0]=Charge(bool) → out[0]=Out(bool). While Charge is on the stored charge
+// rises over chargeTime seconds; while off it falls over dischargeTime seconds.
+// The output turns on when fully charged and off when fully discharged.
+// A time of 0 is instant, so charge=0/discharge=3.5 is a 3.5s off-delay and
+// charge=3/discharge=0 is a 3s on-delay. Type 26 in Stormworks XML
+// (ct = charge time, dt = discharge time attributes on <object>).
+class CapacitorNode : public Node {
+public:
+    double chargeTime    = 1.0; // seconds
+    double dischargeTime = 1.0; // seconds
+
+    CapacitorNode() : Node(NodeType::Capacitor, "Capacitor") {
+        inputs  = { Port::makeBool("Charge") };
+        outputs = { Port::makeBool("Out") };
+    }
+    void evaluate() override {
+        const double chargeTicks    = chargeTime    * kTicksPerSecond;
+        const double dischargeTicks = dischargeTime * kTicksPerSecond;
+        if (inputBool(0))
+            charge_ = (chargeTicks <= 0.0) ? 1.0 : std::min(1.0, charge_ + 1.0 / chargeTicks);
+        else
+            charge_ = (dischargeTicks <= 0.0) ? 0.0 : std::max(0.0, charge_ - 1.0 / dischargeTicks);
+
+        if (charge_ >= 1.0)      on_ = true;
+        else if (charge_ <= 0.0) on_ = false;
+        outputBool(0, on_);
+    }
+private:
+    double charge_ = 0.0;
+    bool   on_     = false;
+};
+
 // ── TON — Timer On Delay ──────────────────────────────────────────────────────
 // in[0]=Enable(bool), in[1]=Duration(number) → out[0]=Q(bool)
 // Output goes true after Enable has been true for >= Duration. Resets when Enable false.

@@ -6,6 +6,7 @@
 #include "nodes/FunctionNodes.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QTextStream>
 #include <QDomDocument>
 #include <QDomElement>
@@ -14,7 +15,21 @@
 
 #include <queue>
 #include <unordered_set>
+#include <set>
+#include <utility>
 #include <algorithm>
+#include <cmath>
+
+// ── Stormworks XML position <-> simulator pixel mapping ───────────────────────
+// Loading converts <pos x y> (grid units) to pixels with these constants; saving
+// applies the exact inverse so positions round-trip. I/O bridge nodes are
+// shifted further right than logic components so they start on the far side.
+namespace {
+constexpr int kPositionScale  = 40;  // pixels per Stormworks grid unit
+constexpr int kCompOffsetX    = 40;  // components: 1 grid cell right
+constexpr int kBridgeOffsetX  = 400; // I/O bridge nodes: 10 grid cells right
+constexpr int kOffsetY        = 120; // 3 grid cells down
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // addNode
@@ -258,7 +273,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
     struct NodeInfo {
         NodeType type;
         int px = 0, py = 0;
-        std::vector<std::pair<int,int>> inputs; // (portIdx, srcComponentId)
+        // One entry per wired input: target port, source component, and which
+        // of the source's outputs it comes from (node_index attribute, 0 if absent)
+        struct InputRef { int portIdx; int srcId; int srcPort; };
+        std::vector<InputRef> inputs;
         double literalValue = 0.0;
         bool   hasLiteral   = false;
         int    channelCount = 1;   // for composite packer/splitter/write
@@ -275,6 +293,14 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         double pidKd = 0.0;
         // Function node expression
         QString expression;
+        // Capacitor: ct / dt attributes (seconds)
+        double capCharge    = 1.0;
+        double capDischarge = 1.0;
+        // Property dropdown: name="" and i="" attributes plus <items>
+        QString dropName = "value";
+        int     dropSelected = 0;
+        std::vector<std::pair<QString, double>> dropItems;
+        bool    hasDropItems = false;
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -283,7 +309,6 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
     // Position scale: Stormworks XML units are converted to pixels using our
     // grid cell size (80px) so loaded nodes land exactly on grid lines without
     // relying on NodeGraphView's snap-to-grid to silently correct the offset.
-    constexpr int kPositionScale = 40; // matches the 40px grid cell size
     auto parseObject = [](const QDomElement& obj, NodeInfo& info) {
         // Position
         QDomElement pos = obj.firstChildElement("pos");
@@ -363,13 +388,37 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         if (obj.hasAttribute("e"))
             info.expression = obj.attribute("e");
 
+        // Property dropdown: name="X" i="selected index", <items><i l="label"><v value="N"/>
+        if (obj.hasAttribute("name"))
+            info.dropName = obj.attribute("name");
+        if (obj.hasAttribute("i"))
+            info.dropSelected = obj.attribute("i", "0").toInt();
+        QDomElement itemsElem = obj.firstChildElement("items");
+        if (!itemsElem.isNull()) {
+            info.hasDropItems = true;
+            for (QDomElement it = itemsElem.firstChildElement("i"); !it.isNull();
+                 it = it.nextSiblingElement("i")) {
+                QDomElement v = it.firstChildElement("v");
+                double val = v.isNull() ? 0.0
+                           : v.attribute("value", v.attribute("text", "0")).toDouble();
+                info.dropItems.push_back({ it.attribute("l"), val });
+            }
+        }
+
+        // Capacitor charge/discharge times: ct="X" dt="Y" attributes on <object>
+        if (obj.hasAttribute("ct"))
+            info.capCharge = obj.attribute("ct", "1").toDouble();
+        if (obj.hasAttribute("dt"))
+            info.capDischarge = obj.attribute("dt", "1").toDouble();
+
         // Inputs: <in1 component_id="X"/>, <in2 .../> etc.
         for (int port = 1; port <= 32; ++port) {
             QDomElement inp = obj.firstChildElement(QString("in%1").arg(port));
             if (inp.isNull()) break;
             if (inp.hasAttribute("component_id")) {
-                int srcId = inp.attribute("component_id").toInt();
-                info.inputs.push_back({port - 1, srcId});
+                int srcId   = inp.attribute("component_id").toInt();
+                int srcPort = inp.attribute("node_index", "0").toInt();
+                info.inputs.push_back({port - 1, srcId, srcPort});
             }
         }
     };
@@ -394,6 +443,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             else if (typeStr == "2") ntype = NodeType::NumberInput;    // number input (source)
             else if (typeStr == "3") ntype = NodeType::NumberOutput;   // number output (has input wire)
             else if (typeStr == "4") ntype = NodeType::CompositeInput; // composite input (source)
+            else if (typeStr == "5") ntype = NodeType::CompositeOutput; // composite output (has input wire)
             else                     ntype = NodeType::BoolInput;      // no type = bool input (source)
 
             QDomElement obj = c.firstChildElement("object");
@@ -403,8 +453,8 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             NodeInfo info;
             info.type = ntype;
             parseObject(obj, info);
-            info.px += 400; // 10 grid cells right
-            info.py += 120; // 3 grid cells down
+            info.px += kBridgeOffsetX;
+            info.py += kOffsetY;
             allNodes[compId] = std::move(info);
             originalBridgeIds_[compId] = true;
         }
@@ -433,8 +483,8 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             NodeInfo info;
             info.type = ntype;
             parseObject(obj, info);
-            info.px += 40;  // 1 grid cell right
-            info.py += 120; // 3 grid cells down
+            info.px += kCompOffsetX;
+            info.py += kOffsetY;
             allNodes[compId] = std::move(info);
             originalComponentIds_[compId] = true;
         }
@@ -452,7 +502,6 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         if (info.type == NodeType::NumberLiteral && info.hasLiteral) {
             auto* lit = static_cast<NumberLiteralNode*>(n.get());
             lit->constantValue = info.literalValue;
-            n->name = QString("= %1").arg(info.literalValue);
         }
 
         // Equal To — set tolerance from the <e value="X"/> element
@@ -482,6 +531,33 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             ctr->minVal       = info.counterMin;
             ctr->maxVal       = info.counterMax;
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
+        }
+
+        // Threshold — bounds come from <min text="X"/> / <max text="X"/>, which
+        // parseObject already stores in counterMin/counterMax
+        if (info.type == NodeType::Threshold) {
+            auto* th = static_cast<ThresholdNode*>(n.get());
+            th->minBound = info.counterMin;
+            th->maxBound = info.counterMax;
+        }
+
+        // Property dropdown — name, options and selected index
+        if (info.type == NodeType::PropertyDropdown) {
+            auto* dd = static_cast<PropertyDropdownNode*>(n.get());
+            dd->propertyName = info.dropName;
+            if (info.hasDropItems) {
+                dd->items.clear();
+                for (const auto& [label, value] : info.dropItems)
+                    dd->items.push_back({ label, value });
+            }
+            dd->selected = info.dropSelected;
+        }
+
+        // Capacitor — charge/discharge times from ct/dt attributes
+        if (info.type == NodeType::Capacitor) {
+            auto* cap = static_cast<CapacitorNode*>(n.get());
+            cap->chargeTime    = info.capCharge;
+            cap->dischargeTime = info.capDischarge;
         }
 
         // Memory Register — initial stored value from <r text="X"/>
@@ -518,7 +594,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             auto* wn = static_cast<CompositeWriteNumberNode*>(n.get());
             wn->setChannelCount(info.channelCount);
             wn->setStartIndex(info.startIndex);
-            for (auto& [portIdx, srcId] : info.inputs) portIdx += 1;
+            for (auto& in : info.inputs) in.portIdx += 1;
         }
 
         // Composite write bool — same treatment as write number
@@ -526,7 +602,7 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             auto* wb = static_cast<CompositeWriteBoolNode*>(n.get());
             wb->setChannelCount(info.channelCount);
             wb->setStartIndex(info.startIndex);
-            for (auto& [portIdx, srcId] : info.inputs) portIdx += 1;
+            for (auto& in : info.inputs) in.portIdx += 1;
         }
 
         nodes_[compId] = std::move(n);
@@ -546,13 +622,17 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             connections_.push_back(incConn);
         }
 
-        for (auto& [portIdx, srcId] : info.inputs) {
-            if (!nodes_.count(srcId)) continue;
+        for (const auto& in : info.inputs) {
+            if (!nodes_.count(in.srcId)) continue;
+            // Ignore an out-of-range node_index rather than wiring a bad port
+            const auto& srcOutputs = nodes_.at(in.srcId)->outputs;
+            int srcPort = (in.srcPort >= 0 && in.srcPort < (int)srcOutputs.size())
+                          ? in.srcPort : 0;
             Connection conn;
-            conn.sourceNodeId  = srcId;
-            conn.sourcePortIdx = 0;
+            conn.sourceNodeId  = in.srcId;
+            conn.sourcePortIdx = srcPort;
             conn.targetNodeId  = targetId;
-            conn.targetPortIdx = portIdx;
+            conn.targetPortIdx = in.portIdx;
             connections_.push_back(conn);
         }
     }
@@ -590,7 +670,10 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case  9: return NodeType::Divide;
         case 11: return NodeType::Clamp;
         case 13: return NodeType::MemoryRegister;
+        case 12: return NodeType::Threshold;
         case 14: return NodeType::Abs;
+        case 22: return NodeType::NumericalSwitchbox;
+        case 35: return NodeType::Delta;
         case 38: return NodeType::Modulo;
 
         // ── Function evaluator ────────────────────────────────────────────────
@@ -620,12 +703,24 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
 
         // ── Constants ─────────────────────────────────────────────────────────
         case 15: return NodeType::NumberLiteral;
+        case 16: return NodeType::ConstantOn;
+        case 20: return NodeType::PropertyDropdown;
+
+        // ── Latches / capacitor ───────────────────────────────────────────────
+        case 24: return NodeType::SRLatch;
+        case 25: return NodeType::JKFlipFlop;
+        case 26: return NodeType::Capacitor;
+
+        // ── Pulse nodes ───────────────────────────────────────────────────────
+        case 28: return NodeType::PushToToggle;
+        case 48: return NodeType::ToggleToPush;
 
         // ── Composite ─────────────────────────────────────────────────────────
         case 29: return NodeType::CompositeReadBool;     // Composite Read (on/off)
         case 31: return NodeType::CompositeReadNumber;   // Composite Read (number)
         case 40: return NodeType::CompositeWriteNumber;  // Composite Write (number)
         case 41: return NodeType::CompositeWriteBool;    // Composite Write (on/off)
+        case 53: return NodeType::CompositeSwitchbox;
 
         default:
             ok = false;
@@ -663,6 +758,9 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::Divide:   return 9;
         case NodeType::Clamp:    return 11;
         case NodeType::Abs:      return 14;
+        case NodeType::Threshold:          return 12;
+        case NodeType::NumericalSwitchbox: return 22;
+        case NodeType::Delta:    return 35;
         case NodeType::Modulo:   return 38;
 
         case NodeType::Function1:     return 45;
@@ -684,10 +782,18 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::PIDControllerAdvanced: return 39;
 
         case NodeType::NumberLiteral:       return 15;
+        case NodeType::ConstantOn:          return 16;
+        case NodeType::PropertyDropdown:    return 20;
+        case NodeType::SRLatch:             return 24;
+        case NodeType::JKFlipFlop:          return 25;
+        case NodeType::Capacitor:           return 26;
+        case NodeType::PushToToggle:        return 28;
+        case NodeType::ToggleToPush:        return 48;
         case NodeType::CompositeReadBool:    return 29;
         case NodeType::CompositeReadNumber:  return 31;
         case NodeType::CompositeWriteNumber: return 40;
         case NodeType::CompositeWriteBool:   return 41;
+        case NodeType::CompositeSwitchbox:   return 53;
 
         default: return -1; // I/O types — not written as new <components>
     }
@@ -707,14 +813,32 @@ bool Microcontroller::saveToFile(QString& errorMsg)
 
 bool Microcontroller::saveToFileAs(const QString& path, QString& errorMsg)
 {
-    if (originalDoc_.isNull()) {
-        errorMsg = "No microcontroller loaded to save.";
-        return false;
-    }
-
     // Work on a deep copy so a failed write doesn't corrupt our in-memory
     // original (cloneNode is the QDom way to deep-copy a document)
-    QDomDocument doc = originalDoc_.cloneNode(true).toDocument();
+    QDomDocument doc;
+    if (originalDoc_.isNull()) {
+        // Nothing was loaded (a microcontroller built from scratch in the
+        // editor): start from the same empty skeleton Stormworks writes for a
+        // new microcontroller, then let rebuildXmlSections fill it in.
+        const QString skeleton = QStringLiteral(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<microprocessor name=\"Microcontroller\" description=\"No description set.\" "
+            "width=\"2\" length=\"2\" id_counter=\"0\" id_counter_node=\"0\">"
+            "<nodes/>"
+            "<group>"
+            "<data><inputs/><outputs/></data>"
+            "<components/><components_bridge/><groups/>"
+            "<component_states/><component_bridge_states/><group_states/>"
+            "</group>"
+            "</microprocessor>");
+        if (!doc.setContent(skeleton)) {
+            errorMsg = "Could not create a new microcontroller file.";
+            return false;
+        }
+        doc.documentElement().setAttribute("name", QFileInfo(path).completeBaseName());
+    } else {
+        doc = originalDoc_.cloneNode(true).toDocument();
+    }
 
     rebuildXmlSections(doc);
 
@@ -733,6 +857,33 @@ bool Microcontroller::saveToFileAs(const QString& path, QString& errorMsg)
     // subsequent plain Save continues to diff against what's actually on disk
     originalDoc_ = doc;
 
+    // Drop bookkeeping for nodes that no longer exist (their entries were just
+    // removed from the file), then mark everything now present as original.
+    for (auto it = originalBridgeIds_.begin(); it != originalBridgeIds_.end();)
+        it = nodes_.count(it->first) ? std::next(it) : originalBridgeIds_.erase(it);
+    for (auto it = originalComponentIds_.begin(); it != originalComponentIds_.end();)
+        it = nodes_.count(it->first) ? std::next(it) : originalComponentIds_.erase(it);
+
+    // Everything now present is on disk. Mark it as original so the next save
+    // updates those entries in place instead of appending duplicates.
+    for (const auto& [id, nodePtr] : nodes_) {
+        switch (nodePtr->type) {
+            case NodeType::BoolInput:
+            case NodeType::BoolOutput:
+            case NodeType::NumberInput:
+            case NodeType::NumberOutput:
+            case NodeType::CompositeInput:
+            case NodeType::CompositeOutput:
+                originalBridgeIds_[id] = true;
+                break;
+            default:
+                if (nodePtr->type == NodeType::Not ||
+                    componentTypeFromNodeType(nodePtr->type) >= 0)
+                    originalComponentIds_[id] = true;
+                break;
+        }
+    }
+
     return true;
 }
 
@@ -741,18 +892,17 @@ bool Microcontroller::saveToFileAs(const QString& path, QString& errorMsg)
 //
 // Rewrites <group><components> and <group><components_bridge> in place:
 //   • Existing entries (tracked in originalComponentIds_/originalBridgeIds_)
-//     have their <pos> zeroed and their <inN> children rebuilt to match
+//     have their <pos> updated and their <inN> children rebuilt to match
 //     current connections.
 //   • New logic/math/composite nodes (added this session, not in
 //     originalComponentIds_) get freshly synthesized <c><object> elements
 //     appended to <components>.
 //   • Logic/math/composite nodes that existed originally but were deleted
 //     this session have their <c> element removed entirely.
-//   • I/O bridge nodes (Bool/Number Input/Output, CompositeInput) are only
-//     ever edited in place — new ones are never written, and deleted ones
-//     are left untouched in the DOM (per the Option 2 safety design), since
-//     synthesizing/removing their matching <nodes> vehicle-edge entries
-//     isn't supported.
+//   • I/O bridge nodes (Bool/Number/Composite Input/Output) are handled in
+//     <components_bridge> plus their <nodes> edge connector: edited in place
+//     if they still exist, removed (both entries) if deleted, and appended
+//     (both entries, in the first free board slot) if new.
 // ─────────────────────────────────────────────────────────────────────────────
 void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
 {
@@ -798,20 +948,82 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 int xmlPortNum = isCompositeWrite ? conn.targetPortIdx : conn.targetPortIdx + 1;
                 QDomElement inElem = doc.createElement(QString("in%1").arg(xmlPortNum));
                 inElem.setAttribute("component_id", conn.sourceNodeId);
+                // Wires from a node's 2nd+ output carry node_index (omitted for the first)
+                if (conn.sourcePortIdx > 0)
+                    inElem.setAttribute("node_index", conn.sourcePortIdx);
                 obj.appendChild(inElem);
             }
         }
     };
 
-    // ── Helper: zero out (or create) the <pos> child of obj ───────────────────
-    auto zeroPos = [&](QDomElement& obj) {
+    // ── Helper: write the node's position into the <pos> child of obj ─────────
+    // Inverse of the load-time mapping (offset, then divide by the grid scale),
+    // rounded to Stormworks' 0.25 placement grid.
+    auto writePos = [&](QDomElement& obj, int nodeId) {
         QDomElement pos = obj.firstChildElement("pos");
         if (pos.isNull()) {
             pos = doc.createElement("pos");
             obj.appendChild(pos);
         }
-        pos.setAttribute("x", "0");
-        pos.setAttribute("y", "0");
+
+        double x = 0.0, y = 0.0;
+        if (const Node* n = node(nodeId)) {
+            bool isBridge = false;
+            switch (n->type) {
+                case NodeType::BoolInput:
+                case NodeType::BoolOutput:
+                case NodeType::NumberInput:
+                case NodeType::NumberOutput:
+                case NodeType::CompositeInput:
+                case NodeType::CompositeOutput:
+                    isBridge = true;
+                    break;
+                default: break;
+            }
+            const int offX = isBridge ? kBridgeOffsetX : kCompOffsetX;
+            x = (n->posX - offX)    / double(kPositionScale);
+            y = (n->posY - kOffsetY) / double(kPositionScale);
+            x = std::round(x * 4.0) / 4.0;
+            y = std::round(y * 4.0) / 4.0;
+        }
+        pos.setAttribute("x", QString::number(x));
+        pos.setAttribute("y", QString::number(y));
+    };
+
+    // ── Helper: write a Threshold's bounds as <min text/> and <max text value/> ─
+    auto writeThresholdBounds = [&](QDomElement& obj, const ThresholdNode* th) {
+        QDomElement minElem = obj.firstChildElement("min");
+        if (minElem.isNull()) { minElem = doc.createElement("min"); obj.appendChild(minElem); }
+        minElem.setAttribute("text", QString::number(th->minBound));
+
+        QDomElement maxElem = obj.firstChildElement("max");
+        if (maxElem.isNull()) { maxElem = doc.createElement("max"); obj.appendChild(maxElem); }
+        maxElem.setAttribute("text",  QString::number(th->maxBound));
+        maxElem.setAttribute("value", QString::number(th->maxBound));
+    };
+
+    // ── Helper: write a Property Dropdown's name, selection and <items> ───────
+    auto writeDropdown = [&](QDomElement& obj, const PropertyDropdownNode* dd) {
+        obj.setAttribute("name", dd->propertyName);
+        obj.setAttribute("i", dd->selected);
+
+        QDomElement itemsElem = obj.firstChildElement("items");
+        if (itemsElem.isNull()) {
+            itemsElem = doc.createElement("items");
+            obj.appendChild(itemsElem);
+        }
+        while (itemsElem.hasChildNodes())
+            itemsElem.removeChild(itemsElem.firstChild());
+
+        for (const auto& item : dd->items) {
+            QDomElement iElem = doc.createElement("i");
+            iElem.setAttribute("l", item.label);
+            QDomElement vElem = doc.createElement("v");
+            vElem.setAttribute("text",  QString::number(item.value));
+            vElem.setAttribute("value", QString::number(item.value));
+            iElem.appendChild(vElem);
+            itemsElem.appendChild(iElem);
+        }
     };
 
     // ── Step 1: update existing <components> entries, remove deleted ones ─────
@@ -826,7 +1038,7 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 if (originalComponentIds_.count(compId)) {
                     if (nodes_.count(compId)) {
                         // Still present — update in place
-                        zeroPos(obj);
+                        writePos(obj, compId);
                         rewriteInputs(obj, compId);
 
                         // Sync channel count for write nodes in case it was
@@ -865,6 +1077,14 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                                 obj.setAttribute("e", fn->expression);
                             else
                                 obj.removeAttribute("e");
+                        } else if (liveNode->type == NodeType::Threshold) {
+                            writeThresholdBounds(obj, static_cast<ThresholdNode*>(liveNode));
+                        } else if (liveNode->type == NodeType::PropertyDropdown) {
+                            writeDropdown(obj, static_cast<PropertyDropdownNode*>(liveNode));
+                        } else if (liveNode->type == NodeType::Capacitor) {
+                            auto* cap = static_cast<CapacitorNode*>(liveNode);
+                            obj.setAttribute("ct", QString::number(cap->chargeTime));
+                            obj.setAttribute("dt", QString::number(cap->dischargeTime));
                         } else if (liveNode->type == NodeType::PIDController) {
                             PIDControllerNode* pid = static_cast<PIDControllerNode*>(liveNode);
                             auto writeGainElem = [&](const QString& tag, double gainVal) {
@@ -926,7 +1146,7 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             newObj.setAttribute("id", id);
             newC.appendChild(newObj);
 
-            zeroPos(newObj);
+            writePos(newObj, id);
             rewriteInputs(newObj, id);
 
             // Preserve type-specific extra attributes/children where relevant
@@ -943,6 +1163,15 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 FunctionNodeBase* fn = static_cast<FunctionNodeBase*>(nodePtr.get());
                 if (!fn->expression.isEmpty())
                     newObj.setAttribute("e", fn->expression);
+            }
+            if (nodePtr->type == NodeType::Threshold)
+                writeThresholdBounds(newObj, static_cast<ThresholdNode*>(nodePtr.get()));
+            if (nodePtr->type == NodeType::PropertyDropdown)
+                writeDropdown(newObj, static_cast<PropertyDropdownNode*>(nodePtr.get()));
+            if (nodePtr->type == NodeType::Capacitor) {
+                auto* cap = static_cast<CapacitorNode*>(nodePtr.get());
+                newObj.setAttribute("ct", QString::number(cap->chargeTime));
+                newObj.setAttribute("dt", QString::number(cap->dischargeTime));
             }
             if (nodePtr->type == NodeType::EqualTo) {
                 auto* eq = static_cast<EqualToNode*>(nodePtr.get());
@@ -1008,7 +1237,10 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         }
     }
 
-    // ── Step 2: update existing <components_bridge> entries (edit only) ──────
+    // ── Step 2: update existing <components_bridge> entries, remove deleted ──
+    // A deleted I/O node needs both its bridge <c> and its edge <n> connector
+    // (in <nodes>, matched by component_id) removed.
+    std::set<int> deletedBridgeIds;
     QDomElement compBridge = group.firstChildElement("components_bridge");
     if (!compBridge.isNull()) {
         QDomElement c = compBridge.firstChildElement();
@@ -1017,14 +1249,141 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
             QDomElement obj = c.firstChildElement("object");
             if (!obj.isNull()) {
                 int compId = obj.attribute("id", "-1").toInt();
-                if (originalBridgeIds_.count(compId) && nodes_.count(compId)) {
-                    zeroPos(obj);
-                    rewriteInputs(obj, compId);
+                if (originalBridgeIds_.count(compId)) {
+                    if (nodes_.count(compId)) {
+                        writePos(obj, compId);
+                        rewriteInputs(obj, compId);
+                    } else {
+                        deletedBridgeIds.insert(compId);
+                        compBridge.removeChild(c);
+                    }
                 }
-                // Deleted or newly-added I/O nodes are intentionally left
-                // untouched here — see function header comment.
+                // New I/O nodes are added in step 3.
             }
             c = next;
         }
     }
+    if (!deletedBridgeIds.empty()) {
+        QDomElement nodesEl = root.firstChildElement("nodes");
+        QDomElement n = nodesEl.firstChildElement("n");
+        while (!n.isNull()) {
+            QDomElement nextN = n.nextSiblingElement("n");
+            if (deletedBridgeIds.count(n.attribute("component_id", "-1").toInt()))
+                nodesEl.removeChild(n);
+            n = nextN;
+        }
+    }
+
+    // ── Step 3: append brand-new I/O nodes (bridge components + edge nodes) ───
+    // Each new Bool/Number/Composite Input/Output needs two entries:
+    //   • <components_bridge><c type=..><object id=..>   (the component)
+    //   • <nodes><n id=.. component_id=..><node label mode type ...>
+    //     (the connector on the microcontroller's edge, at an (x, z) slot)
+    // Formats taken from real saved files; see bridgeSpec below.
+    struct BridgeSpec {
+        const char* compType; // <c type=..> in components_bridge; null = no attribute
+        bool        isInput;  // <node mode="1">
+        const char* nodeType; // <node type=..>; null = no attribute (bool)
+    };
+    auto bridgeSpec = [](NodeType t, BridgeSpec& out) -> bool {
+        switch (t) {
+            case NodeType::BoolInput:       out = { nullptr, true,  nullptr }; return true;
+            case NodeType::BoolOutput:      out = { "1",     false, nullptr }; return true;
+            case NodeType::NumberInput:     out = { "2",     true,  "1"     }; return true;
+            case NodeType::NumberOutput:    out = { "3",     false, "1"     }; return true;
+            case NodeType::CompositeInput:  out = { "4",     true,  "5"     }; return true;
+            case NodeType::CompositeOutput: out = { "5",     false, "5"     }; return true;
+            default: return false;
+        }
+    };
+
+    QDomElement nodesElem = root.firstChildElement("nodes");
+    if (nodesElem.isNull()) {
+        nodesElem = doc.createElement("nodes");
+        root.insertBefore(nodesElem, group);
+    }
+    QDomElement bridgeElem = group.firstChildElement("components_bridge");
+    if (bridgeElem.isNull()) {
+        bridgeElem = doc.createElement("components_bridge");
+        group.appendChild(bridgeElem);
+    }
+
+    int boardW = std::max(1, root.attribute("width",  "1").toInt());
+    int boardL = std::max(1, root.attribute("length", "1").toInt());
+
+    // Edge-node ids: id_counter_node holds the last id used
+    int lastNodeId = root.attribute("id_counter_node", "0").toInt();
+    std::set<std::pair<int,int>> usedSlots;
+    for (QDomElement n = nodesElem.firstChildElement("n"); !n.isNull();
+         n = n.nextSiblingElement("n")) {
+        lastNodeId = std::max(lastNodeId, n.attribute("id", "0").toInt());
+        QDomElement pos = n.firstChildElement("node").firstChildElement("position");
+        usedSlots.insert({ pos.attribute("x", "0").toInt(), pos.attribute("z", "0").toInt() });
+    }
+
+    // First free (x, z) slot, row by row; adds a row to the board when full
+    auto takeSlot = [&]() -> std::pair<int,int> {
+        for (int z = 0; z < boardL; ++z)
+            for (int x = 0; x < boardW; ++x)
+                if (!usedSlots.count({ x, z })) { usedSlots.insert({ x, z }); return { x, z }; }
+        std::pair<int,int> slot{ 0, boardL };
+        ++boardL;
+        usedSlots.insert(slot);
+        return slot;
+    };
+
+    // Deterministic order: by component id
+    std::vector<int> newBridgeIds;
+    for (const auto& [id, nodePtr] : nodes_) {
+        BridgeSpec spec;
+        if (bridgeSpec(nodePtr->type, spec) && !originalBridgeIds_.count(id))
+            newBridgeIds.push_back(id);
+    }
+    std::sort(newBridgeIds.begin(), newBridgeIds.end());
+
+    for (int id : newBridgeIds) {
+        const Node* nodePtr = nodes_.at(id).get();
+        BridgeSpec spec;
+        bridgeSpec(nodePtr->type, spec);
+
+        // <components_bridge> entry
+        QDomElement c = doc.createElement("c");
+        if (spec.compType) c.setAttribute("type", spec.compType);
+        QDomElement obj = doc.createElement("object");
+        obj.setAttribute("id", id);
+        c.appendChild(obj);
+        writePos(obj, id);
+        rewriteInputs(obj, id);
+        bridgeElem.appendChild(c);
+
+        // <nodes> entry (edge connector)
+        const auto [slotX, slotZ] = takeSlot();
+        QDomElement n = doc.createElement("n");
+        n.setAttribute("id", ++lastNodeId);
+        n.setAttribute("component_id", id);
+        QDomElement nd = doc.createElement("node");
+        nd.setAttribute("label", spec.isInput ? "Input" : "Output");
+        if (spec.isInput) nd.setAttribute("mode", "1");
+        if (spec.nodeType) nd.setAttribute("type", spec.nodeType);
+        nd.setAttribute("description", "The input signal to be processed.");
+        if (slotX != 0 || slotZ != 0) {
+            QDomElement pos = doc.createElement("position");
+            if (slotX != 0) pos.setAttribute("x", slotX);
+            if (slotZ != 0) pos.setAttribute("z", slotZ);
+            nd.appendChild(pos);
+        }
+        n.appendChild(nd);
+        nodesElem.appendChild(n);
+    }
+
+    if (!newBridgeIds.empty()) {
+        root.setAttribute("length", boardL); // may have grown to fit new connectors
+        root.setAttribute("id_counter_node", lastNodeId);
+    }
+
+    // id_counter holds the highest component id in use; keep it ahead of every
+    // node id this session created so the game never reuses one
+    int maxCompId = root.attribute("id_counter", "0").toInt();
+    for (const auto& [id, _] : nodes_) maxCompId = std::max(maxCompId, id);
+    root.setAttribute("id_counter", maxCompId);
 }

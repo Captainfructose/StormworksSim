@@ -15,14 +15,17 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::NumberInput:         return std::make_unique<NumberInputNode>();
         case NodeType::NumberOutput:        return std::make_unique<NumberOutputNode>();
         case NodeType::NumberLiteral:       return std::make_unique<NumberLiteralNode>();
+        case NodeType::PropertyDropdown:    return std::make_unique<PropertyDropdownNode>();
 
         // ── Composite ─────────────────────────────────────────────────────────
         case NodeType::CompositeInput:       return std::make_unique<CompositeInputNode>();
+        case NodeType::CompositeOutput:      return std::make_unique<CompositeOutputNode>();
         case NodeType::CompositePacker:      return std::make_unique<CompositePackerNode>();
         case NodeType::CompositeReadNumber:  return std::make_unique<CompositeReadNumberNode>();
         case NodeType::CompositeReadBool:    return std::make_unique<CompositeReadBoolNode>();
         case NodeType::CompositeWriteNumber: return std::make_unique<CompositeWriteNumberNode>();
         case NodeType::CompositeWriteBool:   return std::make_unique<CompositeWriteBoolNode>();
+        case NodeType::CompositeSwitchbox:   return std::make_unique<CompositeSwitchboxNode>();
 
         // ── Logic ─────────────────────────────────────────────────────────────
         case NodeType::And:                 return std::make_unique<AndNode>();
@@ -31,6 +34,12 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::Xor:                 return std::make_unique<XorNode>();
         case NodeType::Nand:                return std::make_unique<NandNode>();
         case NodeType::Nor:                 return std::make_unique<NorNode>();
+        case NodeType::ConstantOn:          return std::make_unique<ConstantOnNode>();
+        case NodeType::PushToToggle:        return std::make_unique<PushToToggleNode>();
+        case NodeType::ToggleToPush:        return std::make_unique<ToggleToPushNode>();
+        case NodeType::SRLatch:             return std::make_unique<SRLatchNode>();
+        case NodeType::JKFlipFlop:          return std::make_unique<JKFlipFlopNode>();
+        case NodeType::Capacitor:           return std::make_unique<CapacitorNode>();
 
         // ── Math ──────────────────────────────────────────────────────────────
         case NodeType::Add:                 return std::make_unique<AddNode>();
@@ -40,6 +49,9 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::Clamp:               return std::make_unique<ClampNode>();
         case NodeType::Abs:                 return std::make_unique<AbsNode>();
         case NodeType::Modulo:              return std::make_unique<ModuloNode>();
+        case NodeType::Delta:               return std::make_unique<DeltaNode>();
+        case NodeType::Threshold:           return std::make_unique<ThresholdNode>();
+        case NodeType::NumericalSwitchbox:  return std::make_unique<NumericalSwitchboxNode>();
         case NodeType::GreaterThan:         return std::make_unique<GreaterThanNode>();
         case NodeType::LessThan:            return std::make_unique<LessThanNode>();
         case NodeType::EqualTo:             return std::make_unique<EqualToNode>();

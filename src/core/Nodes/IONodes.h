@@ -62,10 +62,34 @@ class NumberLiteralNode : public Node {
 public:
     double constantValue = 0.0;
 
-    NumberLiteralNode() : Node(NodeType::NumberLiteral, "Number") {
+    NumberLiteralNode() : Node(NodeType::NumberLiteral, "Constant Number") {
         outputs = { Port::makeNumber("Value") };
     }
     void evaluate() override {
         outputNumber(0, constantValue);
     }
+};
+
+// ── PROPERTY DROPDOWN ─────────────────────────────────────────────────────────
+// A named list of label/value options; outputs the value of the selected one.
+// Type 20 in Stormworks XML: name="..." and i="<selected index>" on <object>,
+// options under <items><i l="label"><v text="X" value="X"/></i>...</items>.
+class PropertyDropdownNode : public Node {
+public:
+    struct Item {
+        QString label;
+        double  value = 0.0;
+    };
+
+    QString           propertyName = "value";
+    std::vector<Item> items        = { { "option 1", 0.0 }, { "option 2", 0.0 } };
+    int               selected     = 0;
+
+    PropertyDropdownNode() : Node(NodeType::PropertyDropdown, "Property Dropdown") {
+        outputs = { Port::makeNumber("Value") };
+    }
+    double selectedValue() const {
+        return (selected >= 0 && selected < (int)items.size()) ? items[selected].value : 0.0;
+    }
+    void evaluate() override { outputNumber(0, selectedValue()); }
 };

@@ -22,6 +22,9 @@
 #include <QDialogButtonBox>
 #include <QLineEdit>
 #include <QCheckBox>
+#include <QRadioButton>
+#include <QButtonGroup>
+#include <algorithm>
 #include <QComboBox>
 #include <QScrollArea>
 #include <QFrame>
@@ -76,6 +79,24 @@ qreal NodeGraphItem::outputPortY(int idx) const {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// innerRect — grey display panel, spanning the body below the header
+// inputPortLocalPos — input port circle, inside the grey panel's left side
+// ─────────────────────────────────────────────────────────────────────────────
+QRectF NodeGraphItem::innerRect() const
+{
+    return QRectF(kInnerMarginX,
+                  kHeaderH + kInnerMarginY,
+                  kWidth - kInnerMarginX * 2,
+                  totalHeight() - kHeaderH - kInnerMarginY * 2);
+}
+
+QPointF NodeGraphItem::inputPortLocalPos(int idx) const
+{
+    // Input ports sit on the node's left edge; the grey panel is display-only.
+    return QPointF(kPortRadius + 1, inputPortY(idx));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // boundingRect
 // ─────────────────────────────────────────────────────────────────────────────
 QRectF NodeGraphItem::boundingRect() const
@@ -112,6 +133,9 @@ bool NodeGraphItem::hasSettings() const
         case NodeType::TimerRTO:
         case NodeType::TimerRTF:
         case NodeType::PIDController:
+        case NodeType::Capacitor:
+        case NodeType::Threshold:
+        case NodeType::PropertyDropdown:
         case NodeType::Function1:
         case NodeType::Function3:
         case NodeType::Function8:
@@ -168,29 +192,103 @@ void NodeGraphItem::paint(QPainter* painter,
     const bool   selected = option->state & QStyle::State_Selected;
 
     // ── Background ────────────────────────────────────────────────────────────
-    painter->setPen(selected ? QPen(QColor(0xff, 0xc0, 0x40), 2)
-                              : QPen(QColor(0x55, 0x55, 0x55), 1));
-    painter->setBrush(QColor(0x2b, 0x2b, 0x2b));
-    painter->drawRoundedRect(bounds, 6, 6);
+    // Stormworks-style: flat white block with a thin grey outline
+    constexpr qreal kCornerR = 6.0;
+    const QPen outlinePen = selected ? QPen(QColor(0xff, 0xa0, 0x20), 2)
+                                     : QPen(QColor(0x9a, 0x9a, 0x9a), 1);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(QColor(0xf4, 0xf4, 0xf4));
+    painter->drawRoundedRect(bounds, kCornerR, kCornerR);
+
+    // SR Latch / JK Flip-Flop use the in-game look: plain white block, small
+    // grey icon with the letters at top left, no header strip or grey panel.
+    const bool gameStyle = (node_->type == NodeType::SRLatch ||
+                            node_->type == NodeType::JKFlipFlop);
 
     // ── Header ────────────────────────────────────────────────────────────────
+    // Clipped to the rounded body so the header follows the top corners
     QRectF headerRect(0, 0, kWidth, kHeaderH);
-    painter->setBrush(headerColor());
-    painter->setPen(Qt::NoPen);
-    painter->save();
-    painter->setClipRect(headerRect);
-    painter->drawRoundedRect(bounds, 6, 6);
-    painter->restore();
+    if (!gameStyle) {
+        painter->save();
+        QPainterPath bodyPath;
+        bodyPath.addRoundedRect(bounds, kCornerR, kCornerR);
+        painter->setClipPath(bodyPath);
+        painter->setBrush(QColor(0xdc, 0xdc, 0xdc));
+        painter->drawRect(headerRect);
+        painter->restore();
 
-    painter->setPen(QColor(0x44, 0x44, 0x44));
-    painter->drawLine(0, kHeaderH, kWidth, kHeaderH);
+        painter->setPen(QColor(0x9a, 0x9a, 0x9a));
+        painter->drawLine(0, kHeaderH, kWidth, kHeaderH);
+    }
+
+    // Outline last so the header fill doesn't cover it
+    painter->setPen(outlinePen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRoundedRect(bounds, kCornerR, kCornerR);
+
+    if (gameStyle) {
+        // Icon square with the node's letters
+        const QRectF icon(8, 8, 20, 20);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(0x80, 0x80, 0x80));
+        painter->drawRoundedRect(icon, 2, 2);
+
+        QFont iconFont = painter->font();
+        iconFont.setBold(true);
+        iconFont.setPointSize(8);
+        painter->setFont(iconFont);
+        painter->setPen(Qt::white);
+        painter->drawText(icon, Qt::AlignCenter,
+                          node_->type == NodeType::JKFlipFlop ? "JK" : "SR");
+
+        // Small title beside the icon ("JK Flip-Flop" -> "JK Flip Flop")
+        QFont titleFont = painter->font();
+        titleFont.setBold(false);
+        titleFont.setPointSize(7);
+        painter->setFont(titleFont);
+        painter->setPen(QColor(0x33, 0x33, 0x33));
+        QString title = node_->name;
+        title.replace('-', ' ');
+        painter->drawText(QRectF(icon.right() + 5, icon.top(), kWidth - icon.right() - 10,
+                                 icon.height()),
+                          Qt::AlignVCenter | Qt::AlignLeft, title);
+
+        // Ports — inputs are rings on the left edge, outputs filled discs on the
+        // right edge, all bool (red), each with its label. No state panel.
+        const QColor red(0xf0, 0x10, 0x50);
+        const QColor labelColor(0x33, 0x33, 0x33);
+        for (int i = 0; i < (int)node_->inputs.size(); ++i) {
+            const QPointF c = inputPortLocalPos(i);
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(QPen(red, 2.5));
+            painter->drawEllipse(c, kPortRadius - 1, kPortRadius - 1);
+
+            painter->setPen(labelColor);
+            painter->drawText(QRectF(kPortRadius * 2 + 4, c.y() - kPortRowH * 0.5,
+                                     kWidth * 0.4, kPortRowH),
+                              Qt::AlignVCenter | Qt::AlignLeft, node_->inputs[i].label);
+        }
+        for (int i = 0; i < (int)node_->outputs.size(); ++i) {
+            const qreal cy = outputPortY(i);
+            painter->setBrush(red);
+            painter->setPen(QPen(red.darker(220), 1.5));
+            painter->drawEllipse(QPointF(kWidth - kPortRadius - 1, cy),
+                                 kPortRadius, kPortRadius);
+
+            painter->setPen(labelColor);
+            painter->drawText(QRectF(kWidth * 0.6 - kPortRadius * 2 - 4, cy - kPortRowH * 0.5,
+                                     kWidth * 0.4, kPortRowH),
+                              Qt::AlignVCenter | Qt::AlignRight, node_->outputs[i].label);
+        }
+        return;
+    }
 
     // Header text — leave room for gear button if this node has settings
     QFont headerFont = painter->font();
     headerFont.setBold(true);
     headerFont.setPointSize(8);
     painter->setFont(headerFont);
-    painter->setPen(Qt::white);
+    painter->setPen(QColor(0x33, 0x33, 0x33));
     QRectF textRect = headerRect.adjusted(4, 0, hasSettings() ? -kGearSize - 4 : -4, 0);
     painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
                       painter->fontMetrics().elidedText(node_->name, Qt::ElideRight,
@@ -199,10 +297,10 @@ void NodeGraphItem::paint(QPainter* painter,
     // ── Settings gear button ──────────────────────────────────────────────────
     if (hasSettings()) {
         QRectF gear = gearButtonRect();
-        painter->setBrush(QColor(0xff, 0xff, 0xff, 40));
-        painter->setPen(QPen(QColor(0xff, 0xff, 0xff, 120), 1));
+        painter->setBrush(QColor(0x00, 0x00, 0x00, 20));
+        painter->setPen(QPen(QColor(0x00, 0x00, 0x00, 90), 1));
         painter->drawRoundedRect(gear, 3, 3);
-        painter->setPen(Qt::white);
+        painter->setPen(QColor(0x33, 0x33, 0x33));
         QFont gearFont = painter->font();
         gearFont.setBold(false);
         gearFont.setPointSize(9);
@@ -220,9 +318,11 @@ void NodeGraphItem::paint(QPainter* painter,
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
-                         node_->type == NodeType::NumberLiteral);
-    bool isSinkNode   = (node_->type == NodeType::BoolOutput  ||
-                         node_->type == NodeType::NumberOutput);
+                         node_->type == NodeType::NumberLiteral ||
+                         node_->type == NodeType::PropertyDropdown);
+    bool isSinkNode  = (node_->type == NodeType::BoolOutput  ||
+                         node_->type == NodeType::NumberOutput ||
+                         node_->type == NodeType::CompositeOutput);
 
     // Helper: get port color based on type, port index, and direction.
     auto portColor = [this](const Port& p, bool isOutput, int portIdx) -> QColor {
@@ -231,18 +331,20 @@ void NodeGraphItem::paint(QPainter* painter,
 
         bool isCompositeSide =
             (node_->type == NodeType::CompositeInput ||
+             node_->type == NodeType::CompositeOutput ||
              node_->type == NodeType::CompositePacker) ||
             ((node_->type == NodeType::CompositeReadNumber ||
               node_->type == NodeType::CompositeReadBool) && !isOutput) ||
             (isWriteNode && isOutput) ||
-            (isWriteNode && !isOutput && portIdx == 0);
+            (isWriteNode && !isOutput && portIdx == 0) ||
+            (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIdx < 2));
 
         if (isCompositeSide)
-            return QColor(0xaa, 0x44, 0xdd);
+            return QColor(0x80, 0x00, 0xff);
 
         return (p.type == PortType::Bool)
-               ? QColor(0xdd, 0x44, 0x44)
-               : QColor(0x44, 0xdd, 0x44);
+               ? QColor(0xf0, 0x10, 0x50)
+               : QColor(0x00, 0xe0, 0x50);
     };
 
     // ── Inner display rectangle ───────────────────────────────────────────────
@@ -254,23 +356,16 @@ void NodeGraphItem::paint(QPainter* painter,
     //
     // Layout: inner rect occupies the middle third of the node width,
     // vertically spanning the full body (below header).
-    constexpr qreal kInnerMarginX = kWidth * 0.32;
-    constexpr qreal kInnerMarginY = 4.0;
-    QRectF innerRect(kInnerMarginX,
-                     kHeaderH + kInnerMarginY,
-                     kWidth - kInnerMarginX * 2,
-                     totalHeight() - kHeaderH - kInnerMarginY * 2);
+    const QRectF innerRect = this->innerRect();
 
-    painter->setBrush(QColor(0x22, 0x22, 0x22));
-    painter->setPen(QPen(QColor(0x44, 0x44, 0x44), 1));
+    // Grey "icon" panel, like the grey squares on Stormworks nodes
+    painter->setBrush(QColor(0x80, 0x80, 0x80));
+    painter->setPen(Qt::NoPen);
     painter->drawRoundedRect(innerRect, 3, 3);
 
     int totalPorts = std::max((int)node_->inputs.size(), (int)node_->outputs.size());
     if (totalPorts == 0) totalPorts = 1;
     qreal rowH = innerRect.height() / totalPorts;
-
-    constexpr qreal kInnerCircleR = 4.0;
-    constexpr qreal kInnerPad     = 5.0;
 
     QFont valFont = painter->font();
     valFont.setPointSize(6);
@@ -288,25 +383,53 @@ void NodeGraphItem::paint(QPainter* painter,
     // For logic gates these connect via lines to the gate body
     for (int i = 0; i < (int)node_->inputs.size(); ++i) {
         const Port& p  = node_->inputs[i];
-        qreal cy = innerRect.top() + i * rowH + rowH * 0.5;
-        qreal cx = innerRect.left() + kInnerPad + kInnerCircleR;
+        // These are display-only state indicators — the real input ports are the
+        // rings on the node's left edge. Source/sink nodes show one centred
+        // indicator (circle or value).
+        const bool stateOnly = isSourceNode || isSinkNode;
+        const qreal cy = innerRect.top() + i * rowH + rowH * 0.5;
+        const qreal cx = stateOnly ? innerRect.center().x()
+                                   : innerRect.left() + kInnerPad + kInnerCircleR;
 
         if (p.type == PortType::Bool) {
             bool on = p.asBool();
-            painter->setBrush(on ? QColor(0xdd, 0x44, 0x44) : Qt::NoBrush);
-            painter->setPen(QPen(QColor(0xdd, 0x44, 0x44), 1.5));
-            painter->drawEllipse(QPointF(cx, cy), kInnerCircleR, kInnerCircleR);
+            const QColor red(0xf0, 0x10, 0x50);
+            // A ring, filled while the signal is on. All grey-panel circles share
+            // this size/style. (QBrush(...) is explicit: a bare
+            // `on ? col : Qt::NoBrush` would convert NoBrush to black.)
+            painter->setBrush(on ? QBrush(red) : QBrush(Qt::NoBrush));
+            painter->setPen(QPen(red, kInnerRingW));
+            painter->drawEllipse(QPointF(cx, cy), kInnerRingR, kInnerRingR);
         } else {
-            painter->setPen(QColor(0xaa, 0xaa, 0xaa));
-            QRectF valRect(innerRect.left() + 2, cy - rowH * 0.5,
-                           innerRect.width() * 0.5 - 2, rowH);
+            painter->setPen(Qt::white);
+            QRectF valRect = stateOnly
+                ? QRectF(innerRect.left(), cy - rowH * 0.5, innerRect.width(), rowH)
+                : QRectF(innerRect.left() + 2, cy - rowH * 0.5,
+                         innerRect.width() * 0.5 - 2, rowH);
             painter->drawText(valRect, Qt::AlignVCenter | Qt::AlignHCenter,
                               QString::number(p.asNumber(), 'f', 2));
         }
     }
 
+    // ── Constant Number: show the configured value in the grey panel ──────────
+    if (node_->type == NodeType::NumberLiteral) {
+        auto* lit = static_cast<NumberLiteralNode*>(node_);
+        painter->setPen(Qt::white);
+        painter->drawText(innerRect, Qt::AlignCenter,
+                          QString::number(lit->constantValue, 'g', 8));
+    }
+
+    // ── Property Dropdown: show the selected option's value ──────────────────
+    if (node_->type == NodeType::PropertyDropdown) {
+        auto* dd = static_cast<PropertyDropdownNode*>(node_);
+        painter->setPen(Qt::white);
+        painter->drawText(innerRect, Qt::AlignCenter,
+                          QString::number(dd->selectedValue(), 'g', 8));
+    }
+
     // ── Output circles (right side of inner rect) ─────────────────────────────
-    for (int i = 0; i < (int)node_->outputs.size(); ++i) {
+    // Source/sink nodes already show their value above, so skip the duplicate.
+    for (int i = 0; i < (int)node_->outputs.size() && !isSourceNode && !isSinkNode; ++i) {
         const Port& p  = node_->outputs[i];
         // For logic gates, always center the single output circle vertically
         qreal cy = isLogicGate ? innerRect.center().y()
@@ -315,11 +438,12 @@ void NodeGraphItem::paint(QPainter* painter,
 
         if (p.type == PortType::Bool) {
             bool on = p.asBool();
-            painter->setBrush(on ? QColor(0xdd, 0x44, 0x44) : Qt::NoBrush);
-            painter->setPen(QPen(QColor(0xdd, 0x44, 0x44), 1.5));
-            painter->drawEllipse(QPointF(cx, cy), kInnerCircleR, kInnerCircleR);
+            const QColor red(0xf0, 0x10, 0x50);
+            painter->setBrush(on ? QBrush(red) : QBrush(Qt::NoBrush));
+            painter->setPen(QPen(red, kInnerRingW));
+            painter->drawEllipse(QPointF(cx, cy), kInnerRingR, kInnerRingR);
         } else {
-            painter->setPen(QColor(0xaa, 0xaa, 0xaa));
+            painter->setPen(Qt::white);
             QRectF valRect(innerRect.left() + innerRect.width() * 0.5,
                            cy - rowH * 0.5,
                            innerRect.width() * 0.5 - 2, rowH);
@@ -343,8 +467,8 @@ void NodeGraphItem::paint(QPainter* painter,
         qreal gateCY = (gateT + gateB) * 0.5;
         qreal gateH  = gateB - gateT;
 
-        QColor gateColor = headerColor().lighter(140);
-        painter->setBrush(QColor(0x22, 0x22, 0x22));
+        QColor gateColor = Qt::white;
+        painter->setBrush(QColor(0x80, 0x80, 0x80));
 
         bool hasNegOutput = (node_->type == NodeType::Nand ||
                              node_->type == NodeType::Nor  ||
@@ -353,7 +477,7 @@ void NodeGraphItem::paint(QPainter* painter,
         qreal gateBodyR  = hasNegOutput ? gateR - negCircR * 2 : gateR;
 
         // ── Input connection lines: circle right edge → gate left edge ─────────
-        painter->setPen(QPen(QColor(0x88, 0x88, 0x88), 1));
+        painter->setPen(QPen(Qt::white, kGateLineW));
         int nInputs = (int)node_->inputs.size();
         for (int i = 0; i < nInputs; ++i) {
             qreal cy    = innerRect.top() + i * rowH + rowH * 0.5;
@@ -385,7 +509,7 @@ void NodeGraphItem::paint(QPainter* painter,
         painter->drawLine(QPointF(outFromX, outCY), QPointF(outToX, outCY));
 
         // ── Gate body ─────────────────────────────────────────────────────────
-        painter->setPen(QPen(gateColor, 1.5));
+        painter->setPen(QPen(gateColor, kGateLineW));
         QPainterPath path;
 
         switch (node_->type) {
@@ -471,28 +595,29 @@ void NodeGraphItem::paint(QPainter* painter,
         // ── Negation bubble ───────────────────────────────────────────────────
         if (hasNegOutput) {
             qreal outCY = innerRect.center().y();
-            painter->setBrush(QColor(0x22, 0x22, 0x22));
-            painter->setPen(QPen(gateColor, 1.5));
+            painter->setBrush(QColor(0x80, 0x80, 0x80));
+            painter->setPen(QPen(gateColor, kGateLineW));
             painter->drawEllipse(QPointF(gateBodyR + negCircR, outCY),
                                  negCircR, negCircR);
         }
     }
 
     // ── Port labels and edge connection circles ───────────────────────────────
-    // Input ports (left side) — open circles, hidden on pure source nodes
+    // Input ports (left edge) — rings, hidden on pure source nodes
     if (!isSourceNode) {
         for (int i = 0; i < (int)node_->inputs.size(); ++i) {
             const Port& p  = node_->inputs[i];
-            qreal       cy = inputPortY(i);
+            qreal       cy = inputPortLocalPos(i).y();
+            const qreal labelX = kPortRadius * 2 + 4;
 
+            // Input ports are rings (outputs are filled discs)
             painter->setBrush(Qt::NoBrush);
-            painter->setPen(QPen(portColor(p, false, i), 1.5));
-            painter->drawEllipse(QPointF(kPortRadius + 1, cy), kPortRadius, kPortRadius);
+            painter->setPen(QPen(portColor(p, false, i), 2.5));
+            painter->drawEllipse(inputPortLocalPos(i), kPortRadius - 1, kPortRadius - 1);
 
-            // Label only — no value text (value is shown in inner rect)
-            painter->setPen(QColor(0xcc, 0xcc, 0xcc));
-            QRectF labelRect(kPortRadius * 2 + 4, cy - kPortRowH * 0.5,
-                             kWidth * 0.32 - kPortRadius * 2 - 6, kPortRowH);
+            painter->setPen(QColor(0x33, 0x33, 0x33));
+            QRectF labelRect(labelX, cy - kPortRowH * 0.5,
+                             kInnerMarginX - labelX - 2, kPortRowH);
             painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft, p.label);
         }
     }
@@ -505,11 +630,11 @@ void NodeGraphItem::paint(QPainter* painter,
             qreal       cx = kWidth - kPortRadius - 1;
 
             painter->setBrush(portColor(p, true, i));
-            painter->setPen(Qt::NoPen);
+            painter->setPen(QPen(portColor(p, true, i).darker(220), 1.5));
             painter->drawEllipse(QPointF(cx, cy), kPortRadius, kPortRadius);
 
             // Label only — no value text (value is shown in inner rect)
-            painter->setPen(QColor(0xcc, 0xcc, 0xcc));
+            painter->setPen(QColor(0x33, 0x33, 0x33));
             QRectF labelRect(kWidth * 0.68 + 4, cy - kPortRowH * 0.5,
                              kWidth * 0.32 - kPortRadius * 2 - 6, kPortRowH);
             painter->drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft, p.label);
@@ -522,7 +647,7 @@ void NodeGraphItem::paint(QPainter* painter,
 // ─────────────────────────────────────────────────────────────────────────────
 QPointF NodeGraphItem::inputPortScenePos(int idx) const
 {
-    return mapToScene(QPointF(kPortRadius + 1, inputPortY(idx)));
+    return mapToScene(inputPortLocalPos(idx));
 }
 
 QPointF NodeGraphItem::outputPortScenePos(int idx) const
@@ -539,14 +664,16 @@ bool NodeGraphItem::inputPortsVisible() const
     bool isSourceNode = (node_->type == NodeType::BoolInput   ||
                          node_->type == NodeType::NumberInput  ||
                          node_->type == NodeType::CompositeInput ||
-                         node_->type == NodeType::NumberLiteral);
+                         node_->type == NodeType::NumberLiteral ||
+                         node_->type == NodeType::PropertyDropdown);
     return !isSourceNode;
 }
 
 bool NodeGraphItem::outputPortsVisible() const
 {
     bool isSinkNode = (node_->type == NodeType::BoolOutput  ||
-                       node_->type == NodeType::NumberOutput);
+                       node_->type == NodeType::NumberOutput ||
+                       node_->type == NodeType::CompositeOutput);
     return !isSinkNode;
 }
 
@@ -609,18 +736,20 @@ QColor NodeGraphItem::portColorAt(int portIndex, bool isOutput) const
 
     bool isCompositeSide =
         (node_->type == NodeType::CompositeInput ||
+         node_->type == NodeType::CompositeOutput ||
          node_->type == NodeType::CompositePacker) ||
         ((node_->type == NodeType::CompositeReadNumber ||
           node_->type == NodeType::CompositeReadBool) && !isOutput) ||
         (isWriteNode && isOutput) ||
-        (isWriteNode && !isOutput && portIndex == 0);
+        (isWriteNode && !isOutput && portIndex == 0) ||
+        (node_->type == NodeType::CompositeSwitchbox && (isOutput || portIndex < 2));
 
     if (isCompositeSide)
-        return QColor(0xaa, 0x44, 0xdd); // purple — composite wire
+        return QColor(0x80, 0x00, 0xff); // purple — composite wire
 
     return (p.type == PortType::Bool)
-           ? QColor(0xdd, 0x44, 0x44)   // red — bool
-           : QColor(0x44, 0xdd, 0x44);  // green — number
+           ? QColor(0xf0, 0x10, 0x50)   // red — bool
+           : QColor(0x00, 0xe0, 0x50);  // green — number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -719,7 +848,6 @@ void NodeGraphItem::openSettingsDialog()
 
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
             lit->constantValue = spin->value();
-            node_->name = QString("= %1").arg(lit->constantValue);
             update();
             dialog.accept();
         });
@@ -985,6 +1113,156 @@ void NodeGraphItem::openSettingsDialog()
 
         QObject::connect(buttons, &QDialogButtonBox::accepted, [&, getUseTicks]() {
             getUseTicks() = (combo->currentIndex() == 1);
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Property Dropdown ──────────────────────────────────────────────────────
+    // Name, plus a list of options (label + value) with one selected.
+    // Edits a local copy and writes it back on OK.
+    else if (node_->type == NodeType::PropertyDropdown) {
+        auto* dd = static_cast<PropertyDropdownNode*>(node_);
+        dialog.setMinimumWidth(420);
+
+        layout->addWidget(new QLabel("Property Name:"));
+        auto* nameEdit = new QLineEdit(dd->propertyName);
+        layout->addWidget(nameEdit);
+
+        layout->addWidget(new QLabel("Options (select the active one):"));
+
+        struct Row {
+            QRadioButton*   radio;
+            QLineEdit*      label;
+            QDoubleSpinBox* value;
+        };
+        std::vector<Row> rows;
+        auto* rowsHolder = new QWidget;
+        auto* rowsLayout = new QVBoxLayout(rowsHolder);
+        rowsLayout->setContentsMargins(0, 0, 0, 0);
+        auto* radioGroup = new QButtonGroup(&dialog);
+        layout->addWidget(rowsHolder);
+
+        // Adds one editable option row; removal hides+drops it from `rows`
+        auto addRow = [&](const QString& label, double value, bool selected) {
+            auto* rowWidget = new QWidget;
+            auto* rowLayout = new QHBoxLayout(rowWidget);
+            rowLayout->setContentsMargins(0, 0, 0, 0);
+
+            auto* radio = new QRadioButton;
+            radio->setChecked(selected);
+            radioGroup->addButton(radio);
+            auto* labelEdit = new QLineEdit(label);
+            auto* valueSpin = new QDoubleSpinBox;
+            valueSpin->setRange(-1e9, 1e9);
+            valueSpin->setDecimals(4);
+            valueSpin->setValue(value);
+            auto* removeBtn = new QPushButton("✕");
+            removeBtn->setFixedWidth(28);
+
+            rowLayout->addWidget(radio);
+            rowLayout->addWidget(labelEdit, 1);
+            rowLayout->addWidget(valueSpin);
+            rowLayout->addWidget(removeBtn);
+            rowsLayout->addWidget(rowWidget);
+            rows.push_back({ radio, labelEdit, valueSpin });
+
+            QObject::connect(removeBtn, &QPushButton::clicked, [&, rowWidget, radio]() {
+                rows.erase(std::remove_if(rows.begin(), rows.end(),
+                           [radio](const Row& r) { return r.radio == radio; }),
+                           rows.end());
+                radioGroup->removeButton(radio);
+                // Keep one option selected
+                if (!rows.empty() && !radioGroup->checkedButton())
+                    rows.front().radio->setChecked(true);
+                rowWidget->deleteLater();
+                rowWidget->hide();
+            });
+        };
+
+        for (int i = 0; i < (int)dd->items.size(); ++i)
+            addRow(dd->items[i].label, dd->items[i].value, i == dd->selected);
+
+        auto* addBtn = new QPushButton("+ Add Option");
+        layout->addWidget(addBtn);
+        QObject::connect(addBtn, &QPushButton::clicked, [&]() {
+            addRow(QString("option %1").arg(rows.size() + 1), 0.0, rows.empty());
+        });
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            dd->propertyName = nameEdit->text();
+            dd->items.clear();
+            dd->selected = 0;
+            for (int i = 0; i < (int)rows.size(); ++i) {
+                dd->items.push_back({ rows[i].label->text(), rows[i].value->value() });
+                if (rows[i].radio->isChecked()) dd->selected = i;
+            }
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Threshold ──────────────────────────────────────────────────────────────
+    else if (node_->type == NodeType::Threshold) {
+        auto* th = static_cast<ThresholdNode*>(node_);
+
+        layout->addWidget(new QLabel("Lower Bound:"));
+        auto* minSpin = new QDoubleSpinBox;
+        minSpin->setRange(-1e9, 1e9);
+        minSpin->setDecimals(4);
+        minSpin->setValue(th->minBound);
+        layout->addWidget(minSpin);
+
+        layout->addWidget(new QLabel("Upper Bound:"));
+        auto* maxSpin = new QDoubleSpinBox;
+        maxSpin->setRange(-1e9, 1e9);
+        maxSpin->setDecimals(4);
+        maxSpin->setValue(th->maxBound);
+        layout->addWidget(maxSpin);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            th->minBound = minSpin->value();
+            th->maxBound = maxSpin->value();
+            update();
+            dialog.accept();
+        });
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    }
+
+    // ── Capacitor ──────────────────────────────────────────────────────────────
+    else if (node_->type == NodeType::Capacitor) {
+        auto* cap = static_cast<CapacitorNode*>(node_);
+
+        layout->addWidget(new QLabel("Charge Time (seconds):"));
+        auto* chargeSpin = new QDoubleSpinBox;
+        chargeSpin->setRange(0.0, 1e6);
+        chargeSpin->setDecimals(3);
+        chargeSpin->setSingleStep(0.1);
+        chargeSpin->setValue(cap->chargeTime);
+        layout->addWidget(chargeSpin);
+
+        layout->addWidget(new QLabel("Discharge Time (seconds):"));
+        auto* dischargeSpin = new QDoubleSpinBox;
+        dischargeSpin->setRange(0.0, 1e6);
+        dischargeSpin->setDecimals(3);
+        dischargeSpin->setSingleStep(0.1);
+        dischargeSpin->setValue(cap->dischargeTime);
+        layout->addWidget(dischargeSpin);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout->addWidget(buttons);
+
+        QObject::connect(buttons, &QDialogButtonBox::accepted, [&]() {
+            cap->chargeTime    = chargeSpin->value();
+            cap->dischargeTime = dischargeSpin->value();
             update();
             dialog.accept();
         });
