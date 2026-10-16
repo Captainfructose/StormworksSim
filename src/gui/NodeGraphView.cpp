@@ -354,6 +354,9 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(compositeMenu, "Composite Write Number", NodeType::CompositeWriteNumber);
     addEntry(compositeMenu, "Composite Write Bool",   NodeType::CompositeWriteBool);
     addEntry(compositeMenu, "Composite Switchbox",    NodeType::CompositeSwitchbox);
+    addEntry(compositeMenu, "Lua Script",             NodeType::LuaScript);
+    addEntry(compositeMenu, "Binary to Number",       NodeType::BinaryToNumber);
+    addEntry(compositeMenu, "Number to Binary",       NodeType::NumberToBinary);
 
     QMenu* logicMenu = addMenu->addMenu("Logic");
     addEntry(logicMenu, "AND",  NodeType::And);
@@ -388,6 +391,7 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     QMenu* statefulMenu = addMenu->addMenu("Stateful");
     addEntry(statefulMenu, "Up/Down Counter",     NodeType::UpDownCounter);
     addEntry(statefulMenu, "Memory Register",     NodeType::MemoryRegister);
+    addEntry(statefulMenu, "Blinker",             NodeType::Blinker);
     statefulMenu->addSeparator();
     addEntry(statefulMenu, "TON Timer",           NodeType::TimerTON);
     addEntry(statefulMenu, "TOF Timer",           NodeType::TimerTOF);
@@ -398,7 +402,14 @@ void NodeGraphView::showContextMenu(const QPoint& viewPos, const QPointF& sceneC
     addEntry(statefulMenu, "PID Advanced",        NodeType::PIDControllerAdvanced);
 
     QMenu* propertyMenu = addMenu->addMenu("Property");
-    addEntry(propertyMenu, "Dropdown", NodeType::PropertyDropdown);
+    addEntry(propertyMenu, "Dropdown",        NodeType::PropertyDropdown);
+    addEntry(propertyMenu, "Number",          NodeType::PropertyNumber);
+    addEntry(propertyMenu, "Slider",          NodeType::PropertySlider);
+    addEntry(propertyMenu, "Toggle",          NodeType::PropertyToggle);
+    addEntry(propertyMenu, "Text",            NodeType::PropertyText);
+    propertyMenu->addSeparator();
+    addEntry(propertyMenu, "Tooltip Number",  NodeType::TooltipNumber);
+    addEntry(propertyMenu, "Tooltip On/Off",  NodeType::TooltipOnOff);
 
     QMenu* funcMenu = addMenu->addMenu("Function");
     addEntry(funcMenu, "Function (1 input)",      NodeType::Function1);

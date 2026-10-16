@@ -93,3 +93,88 @@ public:
     }
     void evaluate() override { outputNumber(0, selectedValue()); }
 };
+
+// ── PROPERTY NUMBER ───────────────────────────────────────────────────────────
+// A named number the player sets from the vehicle's property panel.
+// Type 34: n="name" on <object>, value in <v text="X"/>.
+class PropertyNumberNode : public Node {
+public:
+    QString propertyName = "value";
+    double  value        = 0.0;
+
+    PropertyNumberNode() : Node(NodeType::PropertyNumber, "Property Number") {
+        outputs = { Port::makeNumber("Value") };
+    }
+    void evaluate() override { outputNumber(0, value); }
+};
+
+// ── PROPERTY SLIDER ───────────────────────────────────────────────────────────
+// Like Property Number but edited with a slider between min and max in steps.
+// Type 19: n="name", <min text/>, <max text value/>, <int text value/> (step),
+// <v text/> (current value).
+class PropertySliderNode : public Node {
+public:
+    QString propertyName = "value";
+    double  minValue     = 0.0;
+    double  maxValue     = 10.0;
+    double  step         = 1.0;
+    double  value        = 0.0;
+
+    PropertySliderNode() : Node(NodeType::PropertySlider, "Property Slider") {
+        outputs = { Port::makeNumber("Value") };
+    }
+    void evaluate() override { outputNumber(0, value); }
+};
+
+// ── PROPERTY TOGGLE ───────────────────────────────────────────────────────────
+// A named on/off switch set from the property panel. Type 33: n="name" and
+// v="true" on <object> while it is on (the attribute is absent when off).
+class PropertyToggleNode : public Node {
+public:
+    QString propertyName = "value";
+    bool    value        = false;
+
+    PropertyToggleNode() : Node(NodeType::PropertyToggle, "Property Toggle") {
+        outputs = { Port::makeBool("Value") };
+    }
+    void evaluate() override { outputBool(0, value); }
+};
+
+// ── PROPERTY TEXT ─────────────────────────────────────────────────────────────
+// A text property (for Lua scripts); it has no logic ports. Type 58: n="name".
+// Where the text value itself is stored in the file isn't known yet, so only
+// the property name is modelled.
+class PropertyTextNode : public Node {
+public:
+    QString propertyName = "Label";
+
+    PropertyTextNode() : Node(NodeType::PropertyText, "Property Text") {}
+    void evaluate() override {}
+};
+
+// ── TOOLTIP NUMBER ────────────────────────────────────────────────────────────
+// Shows its number input in the vehicle's tooltip under a label. Type 43: l="...".
+class TooltipNumberNode : public Node {
+public:
+    QString tooltipLabel = "value";
+
+    TooltipNumberNode() : Node(NodeType::TooltipNumber, "Tooltip Number") {
+        inputs = { Port::makeNumber("Value") };
+    }
+    void evaluate() override {}
+};
+
+// ── TOOLTIP ON/OFF ────────────────────────────────────────────────────────────
+// Shows its bool input in the vehicle's tooltip as one of two texts.
+// Type 44: l="label" on="text when on" off="text when off".
+class TooltipOnOffNode : public Node {
+public:
+    QString tooltipLabel = "value";
+    QString onText       = "on";
+    QString offText      = "off";
+
+    TooltipOnOffNode() : Node(NodeType::TooltipOnOff, "Tooltip On/Off") {
+        inputs = { Port::makeBool("State") };
+    }
+    void evaluate() override {}
+};

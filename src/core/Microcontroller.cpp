@@ -229,6 +229,63 @@ void Microcontroller::buildEvalOrder()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// preserveAttributeWhitespace
+//
+// Replaces raw \n, \r and \t characters found inside quoted attribute values
+// with character references (&#10; &#13; &#9;), which XML parsers keep as-is.
+// Text outside tags and comments is left untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+static QString preserveAttributeWhitespace(const QString& xml)
+{
+    QString out;
+    out.reserve(xml.size());
+
+    bool inTag   = false; // between '<' and '>'
+    QChar quote;          // the open quote character, or null if not in a value
+
+    for (int i = 0; i < xml.size(); ++i) {
+        const QChar c = xml[i];
+
+        if (!inTag) {
+            if (c == '<') {
+                // Copy comments and CDATA verbatim so quotes in them are ignored
+                if (xml.mid(i, 4) == "<!--") {
+                    int end = xml.indexOf("-->", i + 4);
+                    end = (end < 0) ? xml.size() : end + 3;
+                    out.append(xml.mid(i, end - i));
+                    i = end - 1;
+                    continue;
+                }
+                if (xml.mid(i, 9) == "<![CDATA[") {
+                    int end = xml.indexOf("]]>", i + 9);
+                    end = (end < 0) ? xml.size() : end + 3;
+                    out.append(xml.mid(i, end - i));
+                    i = end - 1;
+                    continue;
+                }
+                inTag = true;
+            }
+            out.append(c);
+            continue;
+        }
+
+        // Inside a tag
+        if (!quote.isNull()) {
+            if (c == quote)       { quote = QChar(); out.append(c); }
+            else if (c == '\n')   out.append("&#10;");
+            else if (c == '\r')   out.append("&#13;");
+            else if (c == '\t')   out.append("&#9;");
+            else                  out.append(c);
+        } else {
+            if (c == '"' || c == '\'') quote = c;
+            else if (c == '>')         inTag = false;
+            out.append(c);
+        }
+    }
+    return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // loadFromFile
 // ─────────────────────────────────────────────────────────────────────────────
 bool Microcontroller::loadFromFile(const QString& path, QString& errorMsg)
@@ -239,10 +296,16 @@ bool Microcontroller::loadFromFile(const QString& path, QString& errorMsg)
         return false;
     }
 
+    // XML parsers normalise raw newlines/tabs inside attribute values to plain
+    // spaces, but Stormworks writes Lua scripts as raw multi-line attributes.
+    // Turning them into character references first keeps the script intact
+    // (a flattened script would have its -- comments swallow the code).
+    const QString xmlText = preserveAttributeWhitespace(QString::fromUtf8(file.readAll()));
+
     QDomDocument doc;
     QString parseError;
     int line = 0, col = 0;
-    if (!doc.setContent(&file, &parseError, &line, &col)) {
+    if (!doc.setContent(xmlText, &parseError, &line, &col)) {
         errorMsg = QString("XML parse error at line %1, col %2: %3")
                    .arg(line).arg(col).arg(parseError);
         return false;
@@ -301,6 +364,17 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         int     dropSelected = 0;
         std::vector<std::pair<QString, double>> dropItems;
         bool    hasDropItems = false;
+        // Property number/slider/toggle/text and tooltip nodes
+        double  propValue = 0.0;            // <v text="X"/>
+        double  propStep  = 1.0;            // <int text="X"/> (slider step)
+        QString textN;                      // n="..." (property name)
+        bool    propBool = false;           // v="true" (property toggle)
+        QString tipLabel = "value";         // l="..." (tooltips)
+        QString tipOn    = "on";            // on="..." (tooltip on/off)
+        QString tipOff   = "off";           // off="..."
+        double  blinkOn  = 0.5;             // on="seconds"  (blinker)
+        double  blinkOff = 0.5;             // off="seconds"
+        QString script;                     // script="..." (Lua node)
     };
 
     std::unordered_map<int, NodeInfo> allNodes;
@@ -405,6 +479,26 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             }
         }
 
+        // Property number/slider value, slider step, property text, tooltip text
+        QDomElement vElem = obj.firstChildElement("v");
+        if (!vElem.isNull())
+            info.propValue = vElem.attribute("value", vElem.attribute("text", "0")).toDouble();
+        QDomElement intElem = obj.firstChildElement("int");
+        if (!intElem.isNull())
+            info.propStep = intElem.attribute("value", intElem.attribute("text", "1")).toDouble();
+        if (obj.hasAttribute("script")) info.script = obj.attribute("script");
+        if (obj.hasAttribute("n"))   info.textN   = obj.attribute("n");
+        if (obj.hasAttribute("v"))   info.propBool = (obj.attribute("v") == "true");
+        if (obj.hasAttribute("l"))   info.tipLabel = obj.attribute("l");
+        if (obj.hasAttribute("on")) {
+            info.tipOn   = obj.attribute("on");
+            info.blinkOn = obj.attribute("on").toDouble();
+        }
+        if (obj.hasAttribute("off")) {
+            info.tipOff   = obj.attribute("off");
+            info.blinkOff = obj.attribute("off").toDouble();
+        }
+
         // Capacitor charge/discharge times: ct="X" dt="Y" attributes on <object>
         if (obj.hasAttribute("ct"))
             info.capCharge = obj.attribute("ct", "1").toDouble();
@@ -490,6 +584,19 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         }
     }
 
+    // ── Edge connector labels ─────────────────────────────────────────────────
+    // <nodes><n component_id="X"><node label="..."> names each I/O connector.
+    std::unordered_map<int, QString> edgeLabels;
+    {
+        QDomElement nodesRoot = root.firstChildElement("nodes");
+        for (QDomElement n = nodesRoot.firstChildElement("n"); !n.isNull();
+             n = n.nextSiblingElement("n")) {
+            QDomElement nd = n.firstChildElement("node");
+            if (nd.hasAttribute("label"))
+                edgeLabels[n.attribute("component_id", "-1").toInt()] = nd.attribute("label");
+        }
+    }
+
     // ── Step 3: create Node objects ───────────────────────────────────────────
     for (auto& [compId, info] : allNodes) {
         auto n = Node::create(info.type);
@@ -497,6 +604,10 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
         n->id   = compId;
         n->posX = info.px;
         n->posY = info.py;
+
+        // I/O bridge nodes carry their connector label
+        if (originalBridgeIds_.count(compId) && edgeLabels.count(compId))
+            n->label = edgeLabels.at(compId);
 
         // Number literal — set constant value
         if (info.type == NodeType::NumberLiteral && info.hasLiteral) {
@@ -531,6 +642,52 @@ bool Microcontroller::parseXmlDocument(const QDomDocument& doc, QString& errorMs
             ctr->minVal       = info.counterMin;
             ctr->maxVal       = info.counterMax;
             ctr->clampEnabled = (info.counterMin != 0.0 || info.counterMax != 0.0);
+        }
+
+        // Lua script text
+        if (info.type == NodeType::LuaScript)
+            static_cast<LuaScriptNode*>(n.get())->script = info.script;
+
+        // Blinker — on/off durations from the on="" and off="" attributes
+        if (info.type == NodeType::Blinker) {
+            auto* bl = static_cast<BlinkerNode*>(n.get());
+            bl->onTime  = std::clamp(info.blinkOn,  BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
+            bl->offTime = std::clamp(info.blinkOff, BlinkerNode::kMinTime, BlinkerNode::kMaxTime);
+        }
+
+        // Property / tooltip nodes
+        // The property name is n="..." on <object>; absent means the default
+        const QString propName = info.textN.isEmpty() ? QString("value") : info.textN;
+        if (info.type == NodeType::PropertyNumber) {
+            auto* pn = static_cast<PropertyNumberNode*>(n.get());
+            pn->propertyName = propName;
+            pn->value        = info.propValue;
+        }
+        if (info.type == NodeType::PropertySlider) {
+            auto* ps = static_cast<PropertySliderNode*>(n.get());
+            ps->propertyName = propName;
+            ps->minValue     = info.counterMin;
+            ps->maxValue     = info.counterMax;
+            ps->step         = info.propStep;
+            ps->value        = info.propValue;
+        }
+        if (info.type == NodeType::PropertyToggle) {
+            auto* pt = static_cast<PropertyToggleNode*>(n.get());
+            pt->propertyName = propName;
+            pt->value        = info.propBool;
+        }
+        if (info.type == NodeType::PropertyText) {
+            if (!info.textN.isEmpty())
+                static_cast<PropertyTextNode*>(n.get())->propertyName = info.textN;
+        }
+        if (info.type == NodeType::TooltipNumber) {
+            static_cast<TooltipNumberNode*>(n.get())->tooltipLabel = info.tipLabel;
+        }
+        if (info.type == NodeType::TooltipOnOff) {
+            auto* tt = static_cast<TooltipOnOffNode*>(n.get());
+            tt->tooltipLabel = info.tipLabel;
+            tt->onText       = info.tipOn;
+            tt->offText      = info.tipOff;
         }
 
         // Threshold — bounds come from <min text="X"/> / <max text="X"/>, which
@@ -705,6 +862,12 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         case 15: return NodeType::NumberLiteral;
         case 16: return NodeType::ConstantOn;
         case 20: return NodeType::PropertyDropdown;
+        case 19: return NodeType::PropertySlider;
+        case 33: return NodeType::PropertyToggle;
+        case 34: return NodeType::PropertyNumber;
+        case 43: return NodeType::TooltipNumber;
+        case 44: return NodeType::TooltipOnOff;
+        case 58: return NodeType::PropertyText;
 
         // ── Latches / capacitor ───────────────────────────────────────────────
         case 24: return NodeType::SRLatch;
@@ -714,6 +877,10 @@ NodeType Microcontroller::nodeTypeFromComponentType(int id, bool& ok) const
         // ── Pulse nodes ───────────────────────────────────────────────────────
         case 28: return NodeType::PushToToggle;
         case 48: return NodeType::ToggleToPush;
+        case 27: return NodeType::Blinker;
+        case 54: return NodeType::NumberToBinary;
+        case 56: return NodeType::LuaScript;
+        case 55: return NodeType::BinaryToNumber;
 
         // ── Composite ─────────────────────────────────────────────────────────
         case 29: return NodeType::CompositeReadBool;     // Composite Read (on/off)
@@ -784,9 +951,19 @@ int Microcontroller::componentTypeFromNodeType(NodeType type) const
         case NodeType::NumberLiteral:       return 15;
         case NodeType::ConstantOn:          return 16;
         case NodeType::PropertyDropdown:    return 20;
+        case NodeType::PropertySlider:      return 19;
+        case NodeType::PropertyToggle:      return 33;
+        case NodeType::PropertyNumber:      return 34;
+        case NodeType::TooltipNumber:       return 43;
+        case NodeType::TooltipOnOff:        return 44;
+        case NodeType::PropertyText:        return 58;
         case NodeType::SRLatch:             return 24;
         case NodeType::JKFlipFlop:          return 25;
         case NodeType::Capacitor:           return 26;
+        case NodeType::Blinker:             return 27;
+        case NodeType::NumberToBinary:      return 54;
+        case NodeType::LuaScript:           return 56;
+        case NodeType::BinaryToNumber:      return 55;
         case NodeType::PushToToggle:        return 28;
         case NodeType::ToggleToPush:        return 48;
         case NodeType::CompositeReadBool:    return 29;
@@ -1002,6 +1179,80 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         maxElem.setAttribute("value", QString::number(th->maxBound));
     };
 
+    // ── Helper: write a Property/Tooltip node's attributes and child elements ──
+    // Returns false for node types it doesn't handle.
+    auto writePropertyData = [&](QDomElement& obj, const Node* n) -> bool {
+        auto setTextValue = [&](const QString& tag, double v, bool withValue) {
+            QDomElement el = obj.firstChildElement(tag);
+            if (el.isNull()) { el = doc.createElement(tag); obj.appendChild(el); }
+            el.setAttribute("text", QString::number(v));
+            if (withValue) el.setAttribute("value", QString::number(v));
+        };
+
+        switch (n->type) {
+            case NodeType::PropertyNumber: {
+                auto* pn = static_cast<const PropertyNumberNode*>(n);
+                obj.setAttribute("n", pn->propertyName);
+                setTextValue("v", pn->value, false);
+                return true;
+            }
+            case NodeType::PropertySlider: {
+                auto* ps = static_cast<const PropertySliderNode*>(n);
+                obj.setAttribute("n", ps->propertyName);
+                setTextValue("min", ps->minValue, false);
+                setTextValue("max", ps->maxValue, true);
+                setTextValue("int", ps->step,     true);
+                setTextValue("v",   ps->value,    false);
+                return true;
+            }
+            case NodeType::PropertyToggle: {
+                auto* pt = static_cast<const PropertyToggleNode*>(n);
+                obj.setAttribute("n", pt->propertyName);
+                if (pt->value) obj.setAttribute("v", "true");
+                else           obj.removeAttribute("v");
+                return true;
+            }
+            case NodeType::PropertyText:
+                obj.setAttribute("n", static_cast<const PropertyTextNode*>(n)->propertyName);
+                return true;
+            case NodeType::TooltipNumber:
+                obj.setAttribute("l", static_cast<const TooltipNumberNode*>(n)->tooltipLabel);
+                return true;
+            case NodeType::LuaScript: {
+                // Script text lives in script="..." on <object>, and a copy sits
+                // on the matching entry in <component_states>; keep both in sync
+                const QString& script = static_cast<const LuaScriptNode*>(n)->script;
+                const int compId = obj.attribute("id", "-1").toInt();
+                auto apply = [&](QDomElement& el) {
+                    if (script.isEmpty()) el.removeAttribute("script");
+                    else                  el.setAttribute("script", script);
+                };
+                apply(obj);
+                QDomElement states = group.firstChildElement("component_states");
+                for (QDomElement s = states.firstChildElement(); !s.isNull();
+                     s = s.nextSiblingElement()) {
+                    if (s.attribute("id", "-1").toInt() == compId) apply(s);
+                }
+                return true;
+            }
+            case NodeType::Blinker: {
+                auto* bl = static_cast<const BlinkerNode*>(n);
+                obj.setAttribute("on",  QString::number(bl->onTime));
+                obj.setAttribute("off", QString::number(bl->offTime));
+                return true;
+            }
+            case NodeType::TooltipOnOff: {
+                auto* tt = static_cast<const TooltipOnOffNode*>(n);
+                obj.setAttribute("l",   tt->tooltipLabel);
+                obj.setAttribute("on",  tt->onText);
+                obj.setAttribute("off", tt->offText);
+                return true;
+            }
+            default:
+                return false;
+        }
+    };
+
     // ── Helper: write a Property Dropdown's name, selection and <items> ───────
     auto writeDropdown = [&](QDomElement& obj, const PropertyDropdownNode* dd) {
         obj.setAttribute("name", dd->propertyName);
@@ -1077,6 +1328,8 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                                 obj.setAttribute("e", fn->expression);
                             else
                                 obj.removeAttribute("e");
+                        } else if (writePropertyData(obj, liveNode)) {
+                            // property / tooltip node — attributes written above
                         } else if (liveNode->type == NodeType::Threshold) {
                             writeThresholdBounds(obj, static_cast<ThresholdNode*>(liveNode));
                         } else if (liveNode->type == NodeType::PropertyDropdown) {
@@ -1164,6 +1417,7 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                 if (!fn->expression.isEmpty())
                     newObj.setAttribute("e", fn->expression);
             }
+            writePropertyData(newObj, nodePtr.get());
             if (nodePtr->type == NodeType::Threshold)
                 writeThresholdBounds(newObj, static_cast<ThresholdNode*>(nodePtr.get()));
             if (nodePtr->type == NodeType::PropertyDropdown)
@@ -1253,6 +1507,18 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
                     if (nodes_.count(compId)) {
                         writePos(obj, compId);
                         rewriteInputs(obj, compId);
+                        // Label edits go to the matching edge connector in <nodes>
+                        const QString& label = nodes_.at(compId)->label;
+                        if (!label.isEmpty()) {
+                            QDomElement nodesEl = root.firstChildElement("nodes");
+                            for (QDomElement n = nodesEl.firstChildElement("n"); !n.isNull();
+                                 n = n.nextSiblingElement("n")) {
+                                if (n.attribute("component_id", "-1").toInt() == compId) {
+                                    n.firstChildElement("node").setAttribute("label", label);
+                                    break;
+                                }
+                            }
+                        }
                     } else {
                         deletedBridgeIds.insert(compId);
                         compBridge.removeChild(c);
@@ -1362,7 +1628,8 @@ void Microcontroller::rebuildXmlSections(QDomDocument& doc) const
         n.setAttribute("id", ++lastNodeId);
         n.setAttribute("component_id", id);
         QDomElement nd = doc.createElement("node");
-        nd.setAttribute("label", spec.isInput ? "Input" : "Output");
+        nd.setAttribute("label", !nodePtr->label.isEmpty() ? nodePtr->label
+                                 : QString(spec.isInput ? "Input" : "Output"));
         if (spec.isInput) nd.setAttribute("mode", "1");
         if (spec.nodeType) nd.setAttribute("type", spec.nodeType);
         nd.setAttribute("description", "The input signal to be processed.");

@@ -63,6 +63,40 @@ private:
     double stored_ = 0.0;
 };
 
+// ── BLINKER ───────────────────────────────────────────────────────────────────
+// in[0]=Control(bool) → out[0]=Blinking(bool). While Control is on the output is
+// on for onTime seconds, then off for offTime seconds, repeating. Control off
+// gives off and restarts the cycle. Type 27 in Stormworks XML
+// (on="..." and off="..." attributes on <object>, in seconds).
+class BlinkerNode : public Node {
+public:
+    // Stormworks limits both durations to 0..5 seconds
+    static constexpr double kMinTime = 0.0;
+    static constexpr double kMaxTime = 5.0;
+
+    double onTime  = 0.5; // seconds
+    double offTime = 0.5; // seconds
+
+    BlinkerNode() : Node(NodeType::Blinker, "Blinker") {
+        inputs  = { Port::makeBool("Control") };
+        outputs = { Port::makeBool("Blink") };
+    }
+    void evaluate() override {
+        if (!inputBool(0)) {
+            elapsed_ = 0.0;
+            outputBool(0, false);
+            return;
+        }
+        const double onTicks    = onTime  * kTicksPerSecond;
+        const double cycleTicks = onTicks + offTime * kTicksPerSecond;
+        outputBool(0, elapsed_ < onTicks);
+        elapsed_ += 1.0;
+        if (cycleTicks > 0.0 && elapsed_ >= cycleTicks) elapsed_ = 0.0;
+    }
+private:
+    double elapsed_ = 0.0;
+};
+
 // ── CAPACITOR ─────────────────────────────────────────────────────────────────
 // in[0]=Charge(bool) → out[0]=Out(bool). While Charge is on the stored charge
 // rises over chargeTime seconds; while off it falls over dischargeTime seconds.

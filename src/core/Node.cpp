@@ -16,6 +16,12 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::NumberOutput:        return std::make_unique<NumberOutputNode>();
         case NodeType::NumberLiteral:       return std::make_unique<NumberLiteralNode>();
         case NodeType::PropertyDropdown:    return std::make_unique<PropertyDropdownNode>();
+        case NodeType::PropertyNumber:      return std::make_unique<PropertyNumberNode>();
+        case NodeType::PropertySlider:      return std::make_unique<PropertySliderNode>();
+        case NodeType::PropertyToggle:      return std::make_unique<PropertyToggleNode>();
+        case NodeType::PropertyText:        return std::make_unique<PropertyTextNode>();
+        case NodeType::TooltipNumber:       return std::make_unique<TooltipNumberNode>();
+        case NodeType::TooltipOnOff:        return std::make_unique<TooltipOnOffNode>();
 
         // ── Composite ─────────────────────────────────────────────────────────
         case NodeType::CompositeInput:       return std::make_unique<CompositeInputNode>();
@@ -26,6 +32,9 @@ std::unique_ptr<Node> Node::create(NodeType type)
         case NodeType::CompositeWriteNumber: return std::make_unique<CompositeWriteNumberNode>();
         case NodeType::CompositeWriteBool:   return std::make_unique<CompositeWriteBoolNode>();
         case NodeType::CompositeSwitchbox:   return std::make_unique<CompositeSwitchboxNode>();
+        case NodeType::LuaScript:            return std::make_unique<LuaScriptNode>();
+        case NodeType::BinaryToNumber:       return std::make_unique<BinaryToNumberNode>();
+        case NodeType::NumberToBinary:       return std::make_unique<NumberToBinaryNode>();
 
         // ── Logic ─────────────────────────────────────────────────────────────
         case NodeType::And:                 return std::make_unique<AndNode>();
@@ -59,6 +68,7 @@ std::unique_ptr<Node> Node::create(NodeType type)
         // ── Stateful ──────────────────────────────────────────────────────────
         case NodeType::UpDownCounter:         return std::make_unique<UpDownCounterNode>();
         case NodeType::MemoryRegister:        return std::make_unique<MemoryRegisterNode>();
+        case NodeType::Blinker:               return std::make_unique<BlinkerNode>();
         case NodeType::TimerTON:              return std::make_unique<TimerTONNode>();
         case NodeType::TimerTOF:              return std::make_unique<TimerTOFNode>();
         case NodeType::TimerRTO:              return std::make_unique<TimerRTONode>();
